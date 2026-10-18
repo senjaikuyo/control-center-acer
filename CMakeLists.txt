@@ -21,6 +21,9 @@ qt_add_qml_module(acer-control-center
         qml/Main.qml
         qml/components/TachometerGauge.qml
         qml/components/CustomFanCurve.qml
+        qml/views/LightingView.qml
+        qml/views/BatteryView.qml
+        qml/views/SettingsView.qml
     RESOURCES
         extracted_assets/fanspeed/image/style_1/pointer_temp.png
         extracted_assets/fanspeed/image/style_1/knob_fan_control.png

@@ -220,3 +220,32 @@ void HardwareBridge::setNightLight(bool enabled, qreal level) {
         iface.call("setNightLight", enabled);
     }
 }
+
+void HardwareBridge::setKeyboardColor(int r, int g, int b) {
+    QFile file("/sys/class/leds/rgb:kbd_backlight/multi_intensity");
+    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QTextStream out(&file);
+        out << r << " " << g << " " << b << "\n";
+    }
+
+    QDBusInterface iface("com.tux.Tailor",
+                         "/com/tux/Tailor",
+                         "com.tux.Tailor.Led",
+                         QDBusConnection::systemBus());
+    if (iface.isValid()) {
+        int colorInt = ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF);
+        iface.call("OverrideColor", 0, colorInt);
+    }
+}
+
+void HardwareBridge::setKeyboardBrightness(int brightnessPercent) {
+    int val = static_cast<int>(std::round((brightnessPercent / 100.0) * 255.0));
+    QFile file("/sys/class/leds/rgb:kbd_backlight/brightness");
+    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QTextStream out(&file);
+        out << val << "\n";
+    }
+
+    QProcess::execute("brightnessctl", QStringList() << "--device=rgb:kbd_backlight" << "set" << QString("%1%").arg(brightnessPercent));
+}
+

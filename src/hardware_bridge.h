@@ -65,6 +65,8 @@ public:
     Q_INVOKABLE void setTouchpadEnabled(bool enabled);
     Q_INVOKABLE void setAirplaneMode(bool enabled);
     Q_INVOKABLE void setNightLight(bool enabled, qreal level);
+    Q_INVOKABLE void setKeyboardColor(int r, int g, int b);
+    Q_INVOKABLE void setKeyboardBrightness(int brightnessPercent);
     Q_INVOKABLE void refreshTelemetry();
 
 signals:

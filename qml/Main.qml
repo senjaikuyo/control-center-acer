@@ -1,3 +1,4 @@
+import "views"
 import "components"
 import QtQuick
 import QtQuick.Controls
@@ -12,6 +13,7 @@ ApplicationWindow {
     minimumHeight: 640
     title: "Control Center"
     color: "#0B0E14"
+    property int activeTab: 0
 
     // Unified Design Tokens
     readonly property color colBg: "#0B0E14"
@@ -46,20 +48,21 @@ ApplicationWindow {
                         width: 34
                         height: 30
                         radius: 4
-                        color: index === 0 ? "#122A36" : "transparent"
-                        border.color: index === 0 ? root.colCyan : "transparent"
+                        color: root.activeTab === index ? "#122A36" : "transparent"
+                        border.color: root.activeTab === index ? root.colCyan : "transparent"
                         border.width: 1
 
                         Text {
                             anchors.centerIn: parent
                             text: index === 0 ? "⚡" : (index === 1 ? "💡" : (index === 2 ? "🔋" : "⚙"))
                             font.pixelSize: 13
-                            color: index === 0 ? root.colCyan : root.colTextMuted
+                            color: root.activeTab === index ? root.colCyan : root.colTextMuted
                         }
 
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
+                            onClicked: root.activeTab = index
                         }
                     }
                 }
@@ -158,9 +161,28 @@ ApplicationWindow {
         }
 
         // ====================================================================
-        // DASHBOARD 3x2 GRID
+        // MULTI-VIEW STACK
         // ====================================================================
+        LightingView {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            visible: root.activeTab === 1
+        }
+
+        BatteryView {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            visible: root.activeTab === 2
+        }
+
+        SettingsView {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            visible: root.activeTab === 3
+        }
+
         GridLayout {
+            visible: root.activeTab === 0
             Layout.fillWidth: true
             Layout.fillHeight: true
             columns: 3
