@@ -29,25 +29,30 @@ pub fn render(app: &mut AcerApp, ctx: &egui::Context, ui: &mut egui::Ui) {
     let full_rect = ui.max_rect();
     ui.painter().rect_filled(full_rect, 0.0, BG_CANVAS);
 
-    // Main margin
-    egui::Frame::new()
-        .inner_margin(egui::Margin::symmetric(24, 20))
+    // Make main window content scrollable cleanly so it never clips or overflows on small window sizes / tile snaps
+    egui::ScrollArea::vertical()
+        .auto_shrink([false, false])
         .show(ui, |ui| {
-            ui.spacing_mut().item_spacing = Vec2::new(16.0, 16.0);
+            // Main margin
+            egui::Frame::new()
+                .inner_margin(egui::Margin::symmetric(24, 20))
+                .show(ui, |ui| {
+                    ui.spacing_mut().item_spacing = Vec2::new(16.0, 16.0);
 
-            // 1. App Header
-            render_header(app, ui);
+                    // 1. App Header
+                    render_header(app, ui);
 
-            ui.add_space(4.0);
+                    ui.add_space(4.0);
 
-            // 2. Main Bento Grid (Top Row: KPI Cards)
-            render_top_kpis(app, ui);
+                    // 2. Main Bento Grid (Top Row: KPI Cards)
+                    render_top_kpis(app, ui);
 
-            // 3. Middle Section: Cooling & Fan Control
-            render_cooling_section(app, ui);
+                    // 3. Middle Section: Cooling & Fan Control
+                    render_cooling_section(app, ui);
 
-            // 4. Bottom Section: System Modes & Preferences
-            render_bottom_section(app, ui);
+                    // 4. Bottom Section: System Modes & Preferences
+                    render_bottom_section(app, ui);
+                });
         });
 }
 
@@ -128,56 +133,116 @@ fn render_header(app: &mut AcerApp, ui: &mut egui::Ui) {
 // 2. TOP METRIC CARDS (BENTO KPIS)
 // ============================================================================
 fn render_top_kpis(app: &AcerApp, ui: &mut egui::Ui) {
-    ui.columns(4, |cols| {
-        // CPU Card
-        render_kpi_card(
-            &mut cols[0],
-            "CPU",
-            "Core i5-13420H",
-            &format!("{} ℃", app.cpu_temp),
-            &format!("{:.2} GHz • {}%", app.cpu_clock_mhz as f32 / 1000.0, app.cpu_usage_pct),
-            temp_to_color(app.cpu_temp),
-            app.cpu_usage_pct,
-        );
+    let avail_w = ui.available_width();
+    let num_cols = if avail_w < 600.0 {
+        2
+    } else {
+        4
+    };
 
-        // GPU Card
-        let (gpu_temp_str, gpu_subtext) = if app.gpu_clock_mhz > 0 || app.gpu_temp > 0 {
-            (format!("{} ℃", app.gpu_temp), format!("{} MHz • {}%", app.gpu_clock_mhz, app.gpu_usage_pct))
-        } else {
-            ("SLEEP".to_string(), "Optimus Standby".to_string())
-        };
-        render_kpi_card(
-            &mut cols[1],
-            "GPU",
-            "GeForce RTX 3050",
-            &gpu_temp_str,
-            &gpu_subtext,
-            if app.gpu_temp > 0 { temp_to_color(app.gpu_temp) } else { TEXT_SECONDARY },
-            app.gpu_usage_pct,
-        );
+    if num_cols == 2 {
+        ui.columns(2, |cols| {
+            render_kpi_card(
+                &mut cols[0],
+                "CPU",
+                "Core i5-13420H",
+                &format!("{} ℃", app.cpu_temp),
+                &format!("{:.2} GHz • {}%", app.cpu_clock_mhz as f32 / 1000.0, app.cpu_usage_pct),
+                temp_to_color(app.cpu_temp),
+                app.cpu_usage_pct,
+            );
 
-        // Memory Card
-        render_kpi_card(
-            &mut cols[2],
-            "MEMORY",
-            &format!("{:.1} / {:.1} GB", app.mem_used_gb, app.mem_total_gb),
-            &format!("{}%", app.mem_pct),
-            "System RAM in use",
-            ACCENT_BLUE,
-            app.mem_pct,
-        );
+            let (gpu_temp_str, gpu_subtext) = if app.gpu_clock_mhz > 0 || app.gpu_temp > 0 {
+                (format!("{} ℃", app.gpu_temp), format!("{} MHz • {}%", app.gpu_clock_mhz, app.gpu_usage_pct))
+            } else {
+                ("SLEEP".to_string(), "Optimus Standby".to_string())
+            };
+            render_kpi_card(
+                &mut cols[1],
+                "GPU",
+                "GeForce RTX 3050",
+                &gpu_temp_str,
+                &gpu_subtext,
+                if app.gpu_temp > 0 { temp_to_color(app.gpu_temp) } else { TEXT_SECONDARY },
+                app.gpu_usage_pct,
+            );
+        });
 
-        // Storage Card
-        render_kpi_card(
-            &mut cols[3],
-            "STORAGE",
-            &format!("{} / {} GB", app.disk_used_gb, app.disk_total_gb),
-            &format!("{}%", app.disk_pct),
-            "Root partition usage",
-            ACCENT_BLUE,
-            app.disk_pct,
-        );
-    });
+        ui.add_space(8.0);
+
+        ui.columns(2, |cols| {
+            render_kpi_card(
+                &mut cols[0],
+                "MEMORY",
+                &format!("{:.1} / {:.1} GB", app.mem_used_gb, app.mem_total_gb),
+                &format!("{}%", app.mem_pct),
+                "System RAM in use",
+                ACCENT_BLUE,
+                app.mem_pct,
+            );
+
+            render_kpi_card(
+                &mut cols[1],
+                "STORAGE",
+                &format!("{} / {} GB", app.disk_used_gb, app.disk_total_gb),
+                &format!("{}%", app.disk_pct),
+                "Root partition usage",
+                ACCENT_BLUE,
+                app.disk_pct,
+            );
+        });
+    } else {
+        ui.columns(4, |cols| {
+            // CPU Card
+            render_kpi_card(
+                &mut cols[0],
+                "CPU",
+                "Core i5-13420H",
+                &format!("{} ℃", app.cpu_temp),
+                &format!("{:.2} GHz • {}%", app.cpu_clock_mhz as f32 / 1000.0, app.cpu_usage_pct),
+                temp_to_color(app.cpu_temp),
+                app.cpu_usage_pct,
+            );
+
+            // GPU Card
+            let (gpu_temp_str, gpu_subtext) = if app.gpu_clock_mhz > 0 || app.gpu_temp > 0 {
+                (format!("{} ℃", app.gpu_temp), format!("{} MHz • {}%", app.gpu_clock_mhz, app.gpu_usage_pct))
+            } else {
+                ("SLEEP".to_string(), "Optimus Standby".to_string())
+            };
+            render_kpi_card(
+                &mut cols[1],
+                "GPU",
+                "GeForce RTX 3050",
+                &gpu_temp_str,
+                &gpu_subtext,
+                if app.gpu_temp > 0 { temp_to_color(app.gpu_temp) } else { TEXT_SECONDARY },
+                app.gpu_usage_pct,
+            );
+
+            // Memory Card
+            render_kpi_card(
+                &mut cols[2],
+                "MEMORY",
+                &format!("{:.1} / {:.1} GB", app.mem_used_gb, app.mem_total_gb),
+                &format!("{}%", app.mem_pct),
+                "System RAM in use",
+                ACCENT_BLUE,
+                app.mem_pct,
+            );
+
+            // Storage Card
+            render_kpi_card(
+                &mut cols[3],
+                "STORAGE",
+                &format!("{} / {} GB", app.disk_used_gb, app.disk_total_gb),
+                &format!("{}%", app.disk_pct),
+                "Root partition usage",
+                ACCENT_BLUE,
+                app.disk_pct,
+            );
+        });
+    }
 }
 
 fn render_kpi_card(
@@ -240,7 +305,7 @@ fn render_cooling_section(app: &mut AcerApp, ui: &mut egui::Ui) {
                         let btn = ui.add(
                             egui::Button::new(
                                 egui::RichText::new(label)
-                                    .size(12.0)
+                                    .size(11.0)
                                     .strong()
                                     .color(if is_active { Color32::WHITE } else { TEXT_SECONDARY }),
                             )
@@ -251,7 +316,7 @@ fn render_cooling_section(app: &mut AcerApp, ui: &mut egui::Ui) {
                             })
                             .stroke(Stroke::new(1.0, if is_active { Color32::TRANSPARENT } else { BORDER_COLOR }))
                             .corner_radius(6)
-                            .min_size(Vec2::new(90.0, 28.0)),
+                            .min_size(Vec2::new(76.0, 26.0)),
                         );
                         if btn.clicked() {
                             app.set_fan_mode(mode);
@@ -263,14 +328,13 @@ fn render_cooling_section(app: &mut AcerApp, ui: &mut egui::Ui) {
 
             ui.add_space(14.0);
 
-            ui.columns(2, |cols| {
-                // Left Column: Live Fan Telemetry
-                let col_left = &mut cols[0];
-                col_left.vertical(|ui| {
+            let avail_w = ui.available_width();
+            if avail_w < 680.0 {
+                // Stack vertically on narrow windows
+                ui.vertical(|ui| {
                     ui.label(egui::RichText::new("REAL-TIME RPM").size(11.0).strong().color(TEXT_DIM));
                     ui.add_space(8.0);
 
-                    // CPU Fan Row
                     render_fan_metric_row(
                         ui,
                         "CPU Fan",
@@ -281,7 +345,6 @@ fn render_cooling_section(app: &mut AcerApp, ui: &mut egui::Ui) {
 
                     ui.add_space(12.0);
 
-                    // GPU Fan Row
                     render_fan_metric_row(
                         ui,
                         "GPU Fan",
@@ -289,11 +352,11 @@ fn render_cooling_section(app: &mut AcerApp, ui: &mut egui::Ui) {
                         app.gpu_fan_pct,
                         ACCENT_GREEN,
                     );
-                });
 
-                // Right Column: Interactive Curve Editor
-                let col_right = &mut cols[1];
-                col_right.vertical(|ui| {
+                    ui.add_space(16.0);
+                    ui.separator();
+                    ui.add_space(12.0);
+
                     ui.horizontal(|ui| {
                         ui.label(egui::RichText::new("CURVE CONFIGURATION").size(11.0).strong().color(TEXT_DIM));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -357,7 +420,101 @@ fn render_cooling_section(app: &mut AcerApp, ui: &mut egui::Ui) {
                         }
                     }
                 });
-            });
+            } else {
+                ui.columns(2, |cols| {
+                    // Left Column: Live Fan Telemetry
+                    let col_left = &mut cols[0];
+                    col_left.vertical(|ui| {
+                        ui.label(egui::RichText::new("REAL-TIME RPM").size(11.0).strong().color(TEXT_DIM));
+                        ui.add_space(8.0);
+
+                        render_fan_metric_row(
+                            ui,
+                            "CPU Fan",
+                            app.cpu_fan_rpm,
+                            app.cpu_fan_pct,
+                            ACCENT_BLUE,
+                        );
+
+                        ui.add_space(12.0);
+
+                        render_fan_metric_row(
+                            ui,
+                            "GPU Fan",
+                            app.gpu_fan_rpm,
+                            app.gpu_fan_pct,
+                            ACCENT_GREEN,
+                        );
+                    });
+
+                    // Right Column: Interactive Curve Editor
+                    let col_right = &mut cols[1];
+                    col_right.vertical(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(egui::RichText::new("CURVE CONFIGURATION").size(11.0).strong().color(TEXT_DIM));
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                let is_cpu = app.active_curve_tab == 0;
+                                if ui.selectable_label(!is_cpu, "GPU Curve").clicked() {
+                                    app.active_curve_tab = 1;
+                                }
+                                if ui.selectable_label(is_cpu, "CPU Curve").clicked() {
+                                    app.active_curve_tab = 0;
+                                }
+                            });
+                        });
+
+                        ui.add_space(8.0);
+
+                        let is_cpu = app.active_curve_tab == 0;
+                        let (cur_temp, cur_speed) = {
+                            let nodes = if is_cpu {
+                                &mut app.cpu_curve_nodes
+                            } else {
+                                &mut app.gpu_curve_nodes
+                            };
+
+                            render_clean_curve_graph(ui, nodes, if is_cpu { ACCENT_BLUE } else { ACCENT_GREEN }, &mut app.selected_node_idx);
+                            let idx = app.selected_node_idx.min(nodes.len().saturating_sub(1));
+                            (nodes[idx].temp as u32, nodes[idx].speed as u32)
+                        };
+
+                        ui.add_space(6.0);
+                        let mut should_reset = false;
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                egui::RichText::new(format!("Selected Point: {} ℃  ➔  {} %", cur_temp, cur_speed))
+                                    .size(11.0)
+                                    .color(TEXT_SECONDARY),
+                            );
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if ui.small_button("Reset Curve").clicked() {
+                                    should_reset = true;
+                                }
+                            });
+                        });
+
+                        if should_reset {
+                            if is_cpu {
+                                app.cpu_curve_nodes = vec![
+                                    FanCurveNode { temp: 25.0, speed: 20.0 },
+                                    FanCurveNode { temp: 45.0, speed: 35.0 },
+                                    FanCurveNode { temp: 65.0, speed: 55.0 },
+                                    FanCurveNode { temp: 80.0, speed: 75.0 },
+                                    FanCurveNode { temp: 95.0, speed: 100.0 },
+                                ];
+                            } else {
+                                app.gpu_curve_nodes = vec![
+                                    FanCurveNode { temp: 30.0, speed: 0.0 },
+                                    FanCurveNode { temp: 50.0, speed: 30.0 },
+                                    FanCurveNode { temp: 65.0, speed: 50.0 },
+                                    FanCurveNode { temp: 75.0, speed: 70.0 },
+                                    FanCurveNode { temp: 85.0, speed: 100.0 },
+                                ];
+                            }
+                        }
+                    });
+                });
+            }
         });
 }
 
@@ -385,75 +542,87 @@ fn render_fan_metric_row(ui: &mut egui::Ui, name: &str, rpm: u32, pct: u32, acce
 // 4. BOTTOM SECTION: QUICK PREFERENCES & SYSTEM INFO
 // ============================================================================
 fn render_bottom_section(app: &mut AcerApp, ui: &mut egui::Ui) {
-    ui.columns(2, |cols| {
-        // Left Column: Peripheral & Hardware Toggles
-        let col_left = &mut cols[0];
-        egui::Frame::new()
-            .fill(BG_CARD)
-            .stroke(Stroke::new(1.0, BORDER_COLOR))
-            .corner_radius(12)
-            .inner_margin(16)
-            .show(col_left, |ui| {
-                ui.label(egui::RichText::new("Hardware Preferences").size(14.0).strong().color(TEXT_PRIMARY));
-                ui.label(egui::RichText::new("Quick toggles for keyboard and peripherals").size(11.0).color(TEXT_SECONDARY));
+    let avail_w = ui.available_width();
+    if avail_w < 680.0 {
+        ui.vertical(|ui| {
+            render_preferences_card(app, ui);
+            ui.add_space(8.0);
+            render_display_card(app, ui);
+        });
+    } else {
+        ui.columns(2, |cols| {
+            render_preferences_card(app, &mut cols[0]);
+            render_display_card(app, &mut cols[1]);
+        });
+    }
+}
 
-                ui.add_space(12.0);
+fn render_preferences_card(app: &mut AcerApp, ui: &mut egui::Ui) {
+    egui::Frame::new()
+        .fill(BG_CARD)
+        .stroke(Stroke::new(1.0, BORDER_COLOR))
+        .corner_radius(12)
+        .inner_margin(16)
+        .show(ui, |ui| {
+            ui.label(egui::RichText::new("Hardware Preferences").size(14.0).strong().color(TEXT_PRIMARY));
+            ui.label(egui::RichText::new("Quick toggles for keyboard and peripherals").size(11.0).color(TEXT_SECONDARY));
 
-                ui.horizontal(|ui| {
-                    if render_toggle_chip(ui, "Touchpad", &mut app.touchpad_enabled) {
-                        app.controller.set_touchpad_enabled(app.touchpad_enabled);
+            ui.add_space(12.0);
+
+            ui.horizontal_wrapped(|ui| {
+                if render_toggle_chip(ui, "Touchpad", &mut app.touchpad_enabled) {
+                    app.controller.set_touchpad_enabled(app.touchpad_enabled);
+                }
+                let _ = render_toggle_chip(ui, "Camera", &mut app.camera_enabled);
+                let _ = render_toggle_chip(ui, "Win Lock", &mut app.win_key_lock);
+                let _ = render_toggle_chip(ui, "Fn Lock", &mut app.fn_key_lock);
+                if render_toggle_chip(ui, "Airplane", &mut app.airplane_mode) {
+                    app.controller.set_airplane_mode(app.airplane_mode);
+                }
+            });
+        });
+}
+
+fn render_display_card(app: &mut AcerApp, ui: &mut egui::Ui) {
+    egui::Frame::new()
+        .fill(BG_CARD)
+        .stroke(Stroke::new(1.0, BORDER_COLOR))
+        .corner_radius(12)
+        .inner_margin(16)
+        .show(ui, |ui| {
+            ui.label(egui::RichText::new("Display & GPU Switching").size(14.0).strong().color(TEXT_PRIMARY));
+            ui.label(egui::RichText::new("Graphics power routing and blue light reduction").size(11.0).color(TEXT_SECONDARY));
+
+            ui.add_space(10.0);
+
+            ui.horizontal(|ui| {
+                let _prev_filter = app.blue_light_filter;
+                let _prev_level = app.blue_light_level;
+
+                if ui.checkbox(&mut app.blue_light_filter, "Night Filter").changed() {
+                    app.controller.set_night_light(app.blue_light_filter, app.blue_light_level);
+                }
+
+                if app.blue_light_filter {
+                    if ui.add(egui::Slider::new(&mut app.blue_light_level, 0.0..=10.0).text("Level")).changed() {
+                        app.controller.set_night_light(true, app.blue_light_level);
                     }
-                    let _ = render_toggle_chip(ui, "Camera", &mut app.camera_enabled);
-                    let _ = render_toggle_chip(ui, "Win Lock", &mut app.win_key_lock);
-                    let _ = render_toggle_chip(ui, "Fn Lock", &mut app.fn_key_lock);
-                    if render_toggle_chip(ui, "Airplane", &mut app.airplane_mode) {
-                        app.controller.set_airplane_mode(app.airplane_mode);
+                }
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let gpu_modes = [
+                        (GpuSwitchMode::Discrete, "dGPU"),
+                        (GpuSwitchMode::Dynamic, "Dynamic"),
+                        (GpuSwitchMode::Integrated, "iGPU"),
+                    ];
+                    for (mode, label) in gpu_modes {
+                        if ui.selectable_label(app.gpu_switch == mode, label).clicked() {
+                            app.set_gpu_switch(mode);
+                        }
                     }
                 });
             });
-
-        // Right Column: Display Comfort & GPU Switching
-        let col_right = &mut cols[1];
-        egui::Frame::new()
-            .fill(BG_CARD)
-            .stroke(Stroke::new(1.0, BORDER_COLOR))
-            .corner_radius(12)
-            .inner_margin(16)
-            .show(col_right, |ui| {
-                ui.label(egui::RichText::new("Display & GPU Switching").size(14.0).strong().color(TEXT_PRIMARY));
-                ui.label(egui::RichText::new("Graphics power routing and blue light reduction").size(11.0).color(TEXT_SECONDARY));
-
-                ui.add_space(10.0);
-
-                ui.horizontal(|ui| {
-                    let _prev_filter = app.blue_light_filter;
-                    let _prev_level = app.blue_light_level;
-
-                    if ui.checkbox(&mut app.blue_light_filter, "Night Filter").changed() {
-                        app.controller.set_night_light(app.blue_light_filter, app.blue_light_level);
-                    }
-
-                    if app.blue_light_filter {
-                        if ui.add(egui::Slider::new(&mut app.blue_light_level, 0.0..=10.0).text("Level")).changed() {
-                            app.controller.set_night_light(true, app.blue_light_level);
-                        }
-                    }
-
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let gpu_modes = [
-                            (GpuSwitchMode::Discrete, "dGPU"),
-                            (GpuSwitchMode::Dynamic, "Dynamic"),
-                            (GpuSwitchMode::Integrated, "iGPU"),
-                        ];
-                        for (mode, label) in gpu_modes {
-                            if ui.selectable_label(app.gpu_switch == mode, label).clicked() {
-                                app.set_gpu_switch(mode);
-                            }
-                        }
-                    });
-                });
-            });
-    });
+        });
 }
 
 fn render_toggle_chip(ui: &mut egui::Ui, label: &str, state: &mut bool) -> bool {
@@ -584,5 +753,57 @@ mod tests {
         assert_eq!(temp_to_color(45), ACCENT_GREEN);
         assert_eq!(temp_to_color(65), ACCENT_ORANGE);
         assert_eq!(temp_to_color(85), ACCENT_RED);
+    }
+
+    #[test]
+    fn test_app_ui_state_defaults() {
+        let app = AcerApp::default();
+        assert_eq!(app.active_tab, 0);
+        assert_eq!(app.power_mode, PowerMode::Performance);
+        assert_eq!(app.fan_mode, FanMode::Automatic);
+        assert_eq!(app.gpu_switch, GpuSwitchMode::Discrete);
+        assert!(app.cpu_curve_nodes.len() >= 5);
+        assert!(app.gpu_curve_nodes.len() >= 5);
+        assert!(app.touchpad_enabled);
+        assert!(app.camera_enabled);
+        assert!(app.num_lock);
+    }
+
+    #[test]
+    fn test_mode_transitions() {
+        let mut app = AcerApp::default();
+
+        app.set_power_profile(PowerMode::Quiet);
+        assert_eq!(app.power_mode, PowerMode::Quiet);
+        assert_eq!(app.fan_mode, FanMode::Automatic);
+
+        app.set_fan_mode(FanMode::Turbo);
+        assert_eq!(app.fan_mode, FanMode::Turbo);
+
+        app.set_fan_mode(FanMode::Custom);
+        assert_eq!(app.fan_mode, FanMode::Custom);
+
+        app.set_gpu_switch(GpuSwitchMode::Integrated);
+        assert_eq!(app.gpu_switch, GpuSwitchMode::Integrated);
+    }
+
+    #[test]
+    fn test_fan_curve_node_bounds() {
+        let mut nodes = vec![
+            FanCurveNode { temp: 20.0, speed: 20.0 },
+            FanCurveNode { temp: 50.0, speed: 50.0 },
+            FanCurveNode { temp: 80.0, speed: 80.0 },
+        ];
+
+        let idx = 1;
+        let candidate_t = 60.0f32;
+        let min_t = nodes[idx - 1].temp + 1.0;
+        let max_t = nodes[idx + 1].temp - 1.0;
+        nodes[idx].temp = candidate_t.clamp(min_t, max_t);
+        assert_eq!(nodes[idx].temp, 60.0);
+
+        let out_of_bounds_t = 90.0f32;
+        nodes[idx].temp = out_of_bounds_t.clamp(min_t, max_t);
+        assert_eq!(nodes[idx].temp, 79.0);
     }
 }
