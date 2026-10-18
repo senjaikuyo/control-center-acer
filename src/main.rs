@@ -139,6 +139,9 @@ impl Default for AcerApp {
         };
 
         app.load_curves_from_disk();
+        if let Some(profile) = backend::get_active_power_profile() {
+            app.power_mode = profile;
+        }
         app.detect_hardware_names();
         app.update_hardware();
         app
@@ -333,10 +336,23 @@ impl AcerApp {
 
     pub fn set_power_profile(&mut self, mode: PowerMode) {
         self.power_mode = mode;
-        let _ = self.controller.set_power_mode(mode);
+        let res = self.controller.set_power_mode(mode);
         if matches!(mode, PowerMode::Quiet | PowerMode::Entertainment) {
             self.fan_mode = FanMode::Automatic;
         }
+
+        let mode_desc = match mode {
+            PowerMode::Quiet => "Quiet (Silent acoustics, power-saver EPP)",
+            PowerMode::Entertainment => "Entertainment (Balanced daily operation)",
+            PowerMode::Performance => "Performance (Maximum Turbo & high boost)",
+        };
+
+        if res.is_ok() {
+            self.curve_feedback = Some(format!("✓ Power mode: {}", mode_desc));
+        } else {
+            self.curve_feedback = Some(format!("Power mode: {}", mode_desc));
+        }
+        self.curve_feedback_time = Some(Instant::now());
     }
 
     pub fn set_fan_mode(&mut self, mode: FanMode) {

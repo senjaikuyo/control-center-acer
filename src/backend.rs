@@ -679,34 +679,12 @@ pub fn apply_clevo_fan_all(speed: u8) -> Result<(), BackendError> {
     Ok(())
 }
 
-/// Sets system power profile via `powerprofilesctl set` (performance, balanced, power-saver),
-/// with fallback to D-Bus `net.hadess.PowerProfiles` if needed.
+/// Sets system power profile via direct D-Bus `net.hadess.PowerProfiles ActiveProfile`,
+/// with fallback to `/usr/bin/python3 /usr/bin/powerprofilesctl` or PATH `powerprofilesctl`.
 pub fn set_power_profile(mode: PowerMode) -> Result<(), BackendError> {
     let profile = mode.as_powerprofiles_str();
 
-    // 1. Try python3 /usr/bin/powerprofilesctl set <profile>
-    let py_res = Command::new("/usr/bin/python3")
-        .args(["/usr/bin/powerprofilesctl", "set", profile])
-        .output();
-
-    if let Ok(out) = py_res {
-        if out.status.success() {
-            return Ok(());
-        }
-    }
-
-    // 2. Try powerprofilesctl directly
-    let direct_res = Command::new("powerprofilesctl")
-        .args(["set", profile])
-        .output();
-
-    if let Ok(out) = direct_res {
-        if out.status.success() {
-            return Ok(());
-        }
-    }
-
-    // 3. Fallback: D-Bus call directly to net.hadess.PowerProfiles ActiveProfile
+    // 1. Direct system D-Bus call to net.hadess.PowerProfiles ActiveProfile (fast, zero python dependency)
     let dbus_res = Command::new("busctl")
         .args([
             "set-property",
@@ -717,17 +695,66 @@ pub fn set_power_profile(mode: PowerMode) -> Result<(), BackendError> {
             "s",
             profile,
         ])
-        .output()?;
+        .output();
 
-    if !dbus_res.status.success() {
-        let err_msg = String::from_utf8_lossy(&dbus_res.stderr).to_string();
-        return Err(BackendError::CommandFailed {
-            command: "set power profile".to_string(),
-            message: err_msg,
-        });
+    if let Ok(out) = dbus_res {
+        if out.status.success() {
+            return Ok(());
+        }
+    }
+
+    // 2. Fallback: Try python3 /usr/bin/powerprofilesctl set <profile>
+    let py_res = Command::new("/usr/bin/python3")
+        .args(["/usr/bin/powerprofilesctl", "set", profile])
+        .output();
+
+    if let Ok(out) = py_res {
+        if out.status.success() {
+            return Ok(());
+        }
+    }
+
+    // 3. Fallback: Try powerprofilesctl directly from PATH
+    let direct_res = Command::new("powerprofilesctl")
+        .args(["set", profile])
+        .output();
+
+    if let Ok(out) = direct_res {
+        if out.status.success() {
+            return Ok(());
+        }
     }
 
     Ok(())
+}
+
+/// Reads the currently active system power profile via D-Bus `net.hadess.PowerProfiles ActiveProfile`.
+pub fn get_active_power_profile() -> Option<PowerMode> {
+    let out = Command::new("busctl")
+        .args([
+            "get-property",
+            "net.hadess.PowerProfiles",
+            "/net/hadess/PowerProfiles",
+            "net.hadess.PowerProfiles",
+            "ActiveProfile",
+        ])
+        .output()
+        .ok()?;
+
+    if out.status.success() {
+        let s = String::from_utf8_lossy(&out.stdout);
+        if s.contains("power-saver") {
+            Some(PowerMode::Quiet)
+        } else if s.contains("performance") {
+            Some(PowerMode::Performance)
+        } else if s.contains("balanced") {
+            Some(PowerMode::Entertainment)
+        } else {
+            None
+        }
+    } else {
+        None
+    }
 }
 
 // ============================================================================

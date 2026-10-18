@@ -243,8 +243,13 @@ fn render_power_profiles(app: &mut AcerApp, ui: &mut egui::Ui) {
 
             for (mode, label) in modes {
                 let is_active = app.power_mode == mode;
+                let active_col = match mode {
+                    PowerMode::Performance => COLOR_GOLD,
+                    PowerMode::Entertainment => COLOR_CYAN,
+                    PowerMode::Quiet => COLOR_TEMP_GREEN,
+                };
                 let text_col = if is_active {
-                    COLOR_GOLD
+                    active_col
                 } else {
                     COLOR_TEXT_MUTED
                 };
@@ -265,18 +270,25 @@ fn render_power_profiles(app: &mut AcerApp, ui: &mut egui::Ui) {
                     text_col,
                 );
 
-                // Active Gold Underline Indicator
+                // Active Mode Underline Indicator
                 if is_active {
                     let underline_rect = Rect::from_min_size(
                         Pos2::new(rect.min.x + 12.0, rect.max.y - 2.5),
                         Vec2::new(rect.width() - 24.0, 2.5),
                     );
-                    painter.rect_filled(underline_rect, 1.2, COLOR_GOLD);
+                    painter.rect_filled(underline_rect, 1.2, active_col);
                 }
 
                 if resp.clicked() {
                     app.set_power_profile(mode);
                 }
+
+                let hover_desc = match mode {
+                    PowerMode::Performance => "Performance: Full boost clock & aggressive fan curve",
+                    PowerMode::Entertainment => "Entertainment: Balanced daily use and acoustics",
+                    PowerMode::Quiet => "Quiet: Energy efficient EPP with whisper-silent cooling",
+                };
+                let _ = resp.on_hover_text(hover_desc);
 
                 ui.add_space(8.0);
             }
@@ -1501,7 +1513,10 @@ mod tests {
     fn test_app_ui_state_defaults() {
         let app = AcerApp::default();
         assert_eq!(app.active_tab, 0);
-        assert_eq!(app.power_mode, PowerMode::Performance);
+        assert!(matches!(
+            app.power_mode,
+            PowerMode::Performance | PowerMode::Entertainment | PowerMode::Quiet
+        ));
         assert_eq!(app.fan_mode, FanMode::Automatic);
         assert_eq!(app.gpu_switch, GpuSwitchMode::Discrete);
         assert!(app.cpu_curve_nodes.len() >= 2);
