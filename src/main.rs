@@ -441,11 +441,40 @@ impl eframe::App for AcerApp {
     }
 }
 
+fn setup_custom_fonts(ctx: &egui::Context) {
+    let mut fonts = egui::FontDefinitions::default();
+
+    if let Ok(data) = fs::read("/usr/share/fonts/TTF/DejaVuSans.ttf") {
+        fonts.font_data.insert(
+            "dejavu_sans".to_owned(),
+            std::sync::Arc::new(egui::FontData::from_owned(data)),
+        );
+        if let Some(vec) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
+            vec.insert(0, "dejavu_sans".to_owned());
+        }
+    }
+
+    if let Ok(data) = fs::read("/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf") {
+        fonts.font_data.insert(
+            "nerd_font".to_owned(),
+            std::sync::Arc::new(egui::FontData::from_owned(data)),
+        );
+        if let Some(vec) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
+            vec.push("nerd_font".to_owned());
+        }
+        if let Some(vec) = fonts.families.get_mut(&egui::FontFamily::Monospace) {
+            vec.insert(0, "nerd_font".to_owned());
+        }
+    }
+
+    ctx.set_fonts(fonts);
+}
+
 fn main() -> eframe::Result<()> {
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1040.0, 680.0])
-            .with_min_inner_size([960.0, 600.0])
+            .with_min_inner_size([1000.0, 640.0])
             .with_title("Control Center"),
         ..Default::default()
     };
@@ -453,6 +482,9 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "com.clevo.ControlCenter",
         native_options,
-        Box::new(|_cc| Ok(Box::new(AcerApp::default()))),
+        Box::new(|cc| {
+            setup_custom_fonts(&cc.egui_ctx);
+            Ok(Box::new(AcerApp::default()))
+        }),
     )
 }
