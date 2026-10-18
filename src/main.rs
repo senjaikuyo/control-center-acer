@@ -47,6 +47,10 @@ pub struct AcerApp {
     pub cpu_curve_nodes: Vec<FanCurveNode>,
     pub gpu_curve_nodes: Vec<FanCurveNode>,
     pub selected_node_idx: usize,
+    pub curve_feedback: Option<String>,
+    pub curve_feedback_time: Option<Instant>,
+    pub last_applied_cpu_pct: u32,
+    pub last_applied_gpu_pct: u32,
 
     // Quick Toggles (Preferences)
     pub win_key_lock: bool,
@@ -104,24 +108,13 @@ impl Default for AcerApp {
             gpu_fan_pct: 0,
 
             active_curve_tab: 0,
-            cpu_curve_nodes: vec![
-                FanCurveNode { temp: 22.0, speed: 20.0 },
-                FanCurveNode { temp: 38.0, speed: 35.0 },
-                FanCurveNode { temp: 50.0, speed: 45.0 },
-                FanCurveNode { temp: 65.0, speed: 55.0 },
-                FanCurveNode { temp: 75.0, speed: 70.0 },
-                FanCurveNode { temp: 85.0, speed: 85.0 },
-                FanCurveNode { temp: 95.0, speed: 100.0 },
-            ],
-            gpu_curve_nodes: vec![
-                FanCurveNode { temp: 30.0, speed: 0.0 },
-                FanCurveNode { temp: 45.0, speed: 30.0 },
-                FanCurveNode { temp: 60.0, speed: 50.0 },
-                FanCurveNode { temp: 72.0, speed: 65.0 },
-                FanCurveNode { temp: 80.0, speed: 80.0 },
-                FanCurveNode { temp: 90.0, speed: 100.0 },
-            ],
+            cpu_curve_nodes: backend::default_cpu_curve(),
+            gpu_curve_nodes: backend::default_gpu_curve(),
             selected_node_idx: 2,
+            curve_feedback: None,
+            curve_feedback_time: None,
+            last_applied_cpu_pct: 35,
+            last_applied_gpu_pct: 0,
 
             win_key_lock: false,
             swap_win_fn: false,
@@ -143,6 +136,7 @@ impl Default for AcerApp {
             last_update: Instant::now() - Duration::from_secs(2),
         };
 
+        app.load_curves_from_disk();
         app.detect_hardware_names();
         app.update_hardware();
         app
@@ -150,6 +144,116 @@ impl Default for AcerApp {
 }
 
 impl AcerApp {
+    pub fn curve_config_path() -> Option<std::path::PathBuf> {
+        std::env::var("HOME")
+            .ok()
+            .map(|home| std::path::PathBuf::from(home).join(".config/acer-control-center/fan_curves.conf"))
+    }
+
+    pub fn save_curves_to_disk(&self) {
+        if let Some(path) = Self::curve_config_path() {
+            if let Some(parent) = path.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            let data = backend::serialize_curve_nodes(&self.cpu_curve_nodes, &self.gpu_curve_nodes);
+            let _ = fs::write(path, data);
+        }
+    }
+
+    pub fn load_curves_from_disk(&mut self) {
+        if let Some(path) = Self::curve_config_path()
+            && let Ok(content) = fs::read_to_string(path)
+            && let Some((cpu, gpu)) = backend::parse_curve_nodes_from_str(&content)
+        {
+            self.cpu_curve_nodes = cpu;
+            self.gpu_curve_nodes = gpu;
+        }
+    }
+
+    pub fn calculate_curve_targets(&self) -> (u32, u32) {
+        let cpu_speed = backend::interpolate_fan_speed(&self.cpu_curve_nodes, self.cpu_temp as f32);
+        let gpu_speed = backend::interpolate_fan_speed(&self.gpu_curve_nodes, self.gpu_temp as f32);
+        (cpu_speed.round() as u32, gpu_speed.round() as u32)
+    }
+
+    pub fn apply_custom_curve(&mut self) {
+        self.controller.telemetry.cpu_temp = self.cpu_temp;
+        self.controller.telemetry.gpu_temp = self.gpu_temp;
+
+        let (cpu_pct, gpu_pct) = match self.controller.apply_custom_curve(
+            &self.cpu_curve_nodes,
+            &self.gpu_curve_nodes,
+        ) {
+            Ok(targets) => targets,
+            Err(_) => self.calculate_curve_targets(),
+        };
+
+        self.last_applied_cpu_pct = cpu_pct;
+        self.last_applied_gpu_pct = gpu_pct;
+
+        if self.fan_mode == FanMode::Custom {
+            self.cpu_fan_pct = cpu_pct;
+            self.gpu_fan_pct = gpu_pct;
+            self.cpu_fan_rpm = (cpu_pct as f32 / 100.0 * 5000.0) as u32;
+            self.gpu_fan_rpm = (gpu_pct as f32 / 100.0 * 4800.0) as u32;
+
+            self.curve_feedback = Some(format!(
+                "Live applied: CPU {}% ({}°C) · GPU {}% ({}°C)",
+                cpu_pct, self.cpu_temp, gpu_pct, self.gpu_temp
+            ));
+            self.curve_feedback_time = Some(Instant::now());
+        }
+    }
+
+    pub fn sync_custom_curve_to_tailord(&mut self) {
+        self.controller.telemetry.cpu_temp = self.cpu_temp;
+        self.controller.telemetry.gpu_temp = self.gpu_temp;
+        self.fan_mode = FanMode::Custom;
+        let _ = self.controller.set_fan_mode(
+            FanMode::Custom,
+            &self.cpu_curve_nodes,
+            &self.gpu_curve_nodes,
+        );
+        let sync_res = self.controller.sync_curve_to_tailord(
+            "custom",
+            &self.cpu_curve_nodes,
+            &self.gpu_curve_nodes,
+        );
+
+        let (cpu_pct, gpu_pct) = self.calculate_curve_targets();
+        self.cpu_fan_pct = cpu_pct;
+        self.gpu_fan_pct = gpu_pct;
+        self.cpu_fan_rpm = (cpu_pct as f32 / 100.0 * 5000.0) as u32;
+        self.gpu_fan_rpm = (gpu_pct as f32 / 100.0 * 4800.0) as u32;
+        self.last_applied_cpu_pct = cpu_pct;
+        self.last_applied_gpu_pct = gpu_pct;
+
+        self.save_curves_to_disk();
+        let status_prefix = if sync_res.is_ok() {
+            "✓ Locked in & synced to tailord"
+        } else {
+            "✓ Saved to disk & applied custom duty"
+        };
+        self.curve_feedback = Some(format!(
+            "{}: CPU {}% · GPU {}%",
+            status_prefix, cpu_pct, gpu_pct
+        ));
+        self.curve_feedback_time = Some(Instant::now());
+    }
+
+    pub fn reset_active_curve(&mut self) {
+        if self.active_curve_tab == 0 {
+            self.cpu_curve_nodes = backend::default_cpu_curve();
+            self.selected_node_idx = self.selected_node_idx.min(self.cpu_curve_nodes.len().saturating_sub(1));
+        } else {
+            self.gpu_curve_nodes = backend::default_gpu_curve();
+            self.selected_node_idx = self.selected_node_idx.min(self.gpu_curve_nodes.len().saturating_sub(1));
+        }
+        self.apply_custom_curve();
+        self.curve_feedback = Some("Curve reset to default profile".to_string());
+        self.curve_feedback_time = Some(Instant::now());
+    }
+
     pub fn detect_hardware_names(&mut self) {
         if let Ok(info) = fs::read_to_string("/proc/cpuinfo") {
             for line in info.lines() {
@@ -205,6 +309,10 @@ impl AcerApp {
         self.gpu_fan_rpm = telem.gpu_fan_rpm;
         self.cpu_fan_pct = telem.cpu_fan_pct;
         self.gpu_fan_pct = telem.gpu_fan_pct;
+
+        let (cpu_target, gpu_target) = self.calculate_curve_targets();
+        self.last_applied_cpu_pct = cpu_target;
+        self.last_applied_gpu_pct = gpu_target;
     }
 
     #[allow(dead_code)]
@@ -222,12 +330,43 @@ impl AcerApp {
     }
 
     pub fn set_fan_mode(&mut self, mode: FanMode) {
+        self.controller.telemetry.cpu_temp = self.cpu_temp;
+        self.controller.telemetry.gpu_temp = self.gpu_temp;
         self.fan_mode = mode;
         let _ = self.controller.set_fan_mode(
             mode,
             &self.cpu_curve_nodes,
             &self.gpu_curve_nodes,
         );
+
+        let telem = &self.controller.telemetry;
+        self.cpu_fan_rpm = telem.cpu_fan_rpm;
+        self.gpu_fan_rpm = telem.gpu_fan_rpm;
+        self.cpu_fan_pct = telem.cpu_fan_pct;
+        self.gpu_fan_pct = telem.gpu_fan_pct;
+
+        let (cpu_target, gpu_target) = self.calculate_curve_targets();
+        self.last_applied_cpu_pct = cpu_target;
+        self.last_applied_gpu_pct = gpu_target;
+
+        match mode {
+            FanMode::Custom => {
+                self.curve_feedback = Some(format!(
+                    "Custom Curve engaged: CPU {}% · GPU {}%",
+                    cpu_target, gpu_target
+                ));
+            }
+            FanMode::Automatic => {
+                self.curve_feedback = Some("Auto Curve engaged (Firmware EC control)".to_string());
+            }
+            FanMode::Maximum => {
+                self.curve_feedback = Some("Max fan mode engaged (100% fixed)".to_string());
+            }
+            FanMode::Turbo => {
+                self.curve_feedback = Some("Turbo fan mode engaged (100% fixed)".to_string());
+            }
+        }
+        self.curve_feedback_time = Some(Instant::now());
     }
 
     pub fn set_gpu_switch(&mut self, mode: GpuSwitchMode) {

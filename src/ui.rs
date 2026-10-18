@@ -286,10 +286,20 @@ fn render_cooling_section(app: &mut AcerApp, ui: &mut egui::Ui) {
         .corner_radius(12)
         .inner_margin(18)
         .show(ui, |ui| {
+            // Header with Title and Mode Switcher
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
-                    ui.label(egui::RichText::new("Fan Cooling & Profiles").size(15.0).strong().color(TEXT_PRIMARY));
-                    ui.label(egui::RichText::new("Adjust dynamic curve or select operational presets").size(12.0).color(TEXT_SECONDARY));
+                    ui.label(
+                        egui::RichText::new("Fan Cooling & Profiles")
+                            .size(15.0)
+                            .strong()
+                            .color(TEXT_PRIMARY),
+                    );
+                    ui.label(
+                        egui::RichText::new("Dynamic fan response curves & instant hardware override")
+                            .size(12.0)
+                            .color(TEXT_SECONDARY),
+                    );
                 });
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -326,199 +336,151 @@ fn render_cooling_section(app: &mut AcerApp, ui: &mut egui::Ui) {
                 });
             });
 
+            ui.add_space(12.0);
+
+            // Active Curve & Cooling Hardware Status Banner
+            render_fan_status_banner(app, ui);
+
             ui.add_space(14.0);
 
             let avail_w = ui.available_width();
             if avail_w < 680.0 {
                 // Stack vertically on narrow windows
                 ui.vertical(|ui| {
-                    ui.label(egui::RichText::new("REAL-TIME RPM").size(11.0).strong().color(TEXT_DIM));
-                    ui.add_space(8.0);
-
-                    render_fan_metric_row(
-                        ui,
-                        "CPU Fan",
-                        app.cpu_fan_rpm,
-                        app.cpu_fan_pct,
-                        ACCENT_BLUE,
-                    );
-
-                    ui.add_space(12.0);
-
-                    render_fan_metric_row(
-                        ui,
-                        "GPU Fan",
-                        app.gpu_fan_rpm,
-                        app.gpu_fan_pct,
-                        ACCENT_GREEN,
-                    );
-
+                    render_fan_telemetry_column(app, ui);
                     ui.add_space(16.0);
                     ui.separator();
                     ui.add_space(12.0);
-
-                    ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new("CURVE CONFIGURATION").size(11.0).strong().color(TEXT_DIM));
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            let is_cpu = app.active_curve_tab == 0;
-                            if ui.selectable_label(!is_cpu, "GPU Curve").clicked() {
-                                app.active_curve_tab = 1;
-                            }
-                            if ui.selectable_label(is_cpu, "CPU Curve").clicked() {
-                                app.active_curve_tab = 0;
-                            }
-                        });
-                    });
-
-                    ui.add_space(8.0);
-
-                    let is_cpu = app.active_curve_tab == 0;
-                    let (cur_temp, cur_speed) = {
-                        let nodes = if is_cpu {
-                            &mut app.cpu_curve_nodes
-                        } else {
-                            &mut app.gpu_curve_nodes
-                        };
-
-                        render_clean_curve_graph(ui, nodes, if is_cpu { ACCENT_BLUE } else { ACCENT_GREEN }, &mut app.selected_node_idx);
-                        let idx = app.selected_node_idx.min(nodes.len().saturating_sub(1));
-                        (nodes[idx].temp as u32, nodes[idx].speed as u32)
-                    };
-
-                    ui.add_space(6.0);
-                    let mut should_reset = false;
-                    ui.horizontal(|ui| {
-                        ui.label(
-                            egui::RichText::new(format!("Selected Point: {} ℃  ➔  {} %", cur_temp, cur_speed))
-                                .size(11.0)
-                                .color(TEXT_SECONDARY),
-                        );
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui.small_button("Reset Curve").clicked() {
-                                should_reset = true;
-                            }
-                        });
-                    });
-
-                    if should_reset {
-                        if is_cpu {
-                            app.cpu_curve_nodes = vec![
-                                FanCurveNode { temp: 25.0, speed: 20.0 },
-                                FanCurveNode { temp: 45.0, speed: 35.0 },
-                                FanCurveNode { temp: 65.0, speed: 55.0 },
-                                FanCurveNode { temp: 80.0, speed: 75.0 },
-                                FanCurveNode { temp: 95.0, speed: 100.0 },
-                            ];
-                        } else {
-                            app.gpu_curve_nodes = vec![
-                                FanCurveNode { temp: 30.0, speed: 0.0 },
-                                FanCurveNode { temp: 50.0, speed: 30.0 },
-                                FanCurveNode { temp: 65.0, speed: 50.0 },
-                                FanCurveNode { temp: 75.0, speed: 70.0 },
-                                FanCurveNode { temp: 85.0, speed: 100.0 },
-                            ];
-                        }
-                    }
+                    render_curve_editor(app, ui);
                 });
             } else {
                 ui.columns(2, |cols| {
-                    // Left Column: Live Fan Telemetry
-                    let col_left = &mut cols[0];
-                    col_left.vertical(|ui| {
-                        ui.label(egui::RichText::new("REAL-TIME RPM").size(11.0).strong().color(TEXT_DIM));
-                        ui.add_space(8.0);
-
-                        render_fan_metric_row(
-                            ui,
-                            "CPU Fan",
-                            app.cpu_fan_rpm,
-                            app.cpu_fan_pct,
-                            ACCENT_BLUE,
-                        );
-
-                        ui.add_space(12.0);
-
-                        render_fan_metric_row(
-                            ui,
-                            "GPU Fan",
-                            app.gpu_fan_rpm,
-                            app.gpu_fan_pct,
-                            ACCENT_GREEN,
-                        );
-                    });
-
-                    // Right Column: Interactive Curve Editor
-                    let col_right = &mut cols[1];
-                    col_right.vertical(|ui| {
-                        ui.horizontal(|ui| {
-                            ui.label(egui::RichText::new("CURVE CONFIGURATION").size(11.0).strong().color(TEXT_DIM));
-                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                let is_cpu = app.active_curve_tab == 0;
-                                if ui.selectable_label(!is_cpu, "GPU Curve").clicked() {
-                                    app.active_curve_tab = 1;
-                                }
-                                if ui.selectable_label(is_cpu, "CPU Curve").clicked() {
-                                    app.active_curve_tab = 0;
-                                }
-                            });
-                        });
-
-                        ui.add_space(8.0);
-
-                        let is_cpu = app.active_curve_tab == 0;
-                        let (cur_temp, cur_speed) = {
-                            let nodes = if is_cpu {
-                                &mut app.cpu_curve_nodes
-                            } else {
-                                &mut app.gpu_curve_nodes
-                            };
-
-                            render_clean_curve_graph(ui, nodes, if is_cpu { ACCENT_BLUE } else { ACCENT_GREEN }, &mut app.selected_node_idx);
-                            let idx = app.selected_node_idx.min(nodes.len().saturating_sub(1));
-                            (nodes[idx].temp as u32, nodes[idx].speed as u32)
-                        };
-
-                        ui.add_space(6.0);
-                        let mut should_reset = false;
-                        ui.horizontal(|ui| {
-                            ui.label(
-                                egui::RichText::new(format!("Selected Point: {} ℃  ➔  {} %", cur_temp, cur_speed))
-                                    .size(11.0)
-                                    .color(TEXT_SECONDARY),
-                            );
-                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                if ui.small_button("Reset Curve").clicked() {
-                                    should_reset = true;
-                                }
-                            });
-                        });
-
-                        if should_reset {
-                            if is_cpu {
-                                app.cpu_curve_nodes = vec![
-                                    FanCurveNode { temp: 25.0, speed: 20.0 },
-                                    FanCurveNode { temp: 45.0, speed: 35.0 },
-                                    FanCurveNode { temp: 65.0, speed: 55.0 },
-                                    FanCurveNode { temp: 80.0, speed: 75.0 },
-                                    FanCurveNode { temp: 95.0, speed: 100.0 },
-                                ];
-                            } else {
-                                app.gpu_curve_nodes = vec![
-                                    FanCurveNode { temp: 30.0, speed: 0.0 },
-                                    FanCurveNode { temp: 50.0, speed: 30.0 },
-                                    FanCurveNode { temp: 65.0, speed: 50.0 },
-                                    FanCurveNode { temp: 75.0, speed: 70.0 },
-                                    FanCurveNode { temp: 85.0, speed: 100.0 },
-                                ];
-                            }
-                        }
-                    });
+                    render_fan_telemetry_column(app, &mut cols[0]);
+                    render_curve_editor(app, &mut cols[1]);
                 });
             }
         });
 }
 
-fn render_fan_metric_row(ui: &mut egui::Ui, name: &str, rpm: u32, pct: u32, accent: Color32) {
+fn render_fan_status_banner(app: &AcerApp, ui: &mut egui::Ui) {
+    let (cpu_target, gpu_target) = app.calculate_curve_targets();
+    let is_custom = app.fan_mode == FanMode::Custom;
+
+    let banner_bg = if is_custom {
+        Color32::from_rgb(18, 38, 26)
+    } else {
+        BG_CARD_SUBTLE
+    };
+    let banner_stroke = if is_custom {
+        Stroke::new(1.0, ACCENT_GREEN)
+    } else {
+        Stroke::new(1.0, BORDER_COLOR)
+    };
+
+    egui::Frame::new()
+        .fill(banner_bg)
+        .stroke(banner_stroke)
+        .corner_radius(8)
+        .inner_margin(egui::Margin::symmetric(14, 9))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                let (badge_text, badge_color) = match app.fan_mode {
+                    FanMode::Custom => ("● ACTIVE CUSTOM CONTROL", ACCENT_GREEN),
+                    FanMode::Automatic => ("○ AUTO FIRMWARE (EC)", ACCENT_BLUE),
+                    FanMode::Maximum => ("▲ MAX OVERRIDE (100%)", ACCENT_ORANGE),
+                    FanMode::Turbo => ("⚡ TURBO OVERRIDE (100%)", ACCENT_RED),
+                };
+
+                ui.label(
+                    egui::RichText::new(badge_text)
+                        .size(11.0)
+                        .strong()
+                        .color(badge_color),
+                );
+
+                ui.add_space(8.0);
+                ui.label(egui::RichText::new("|").size(11.0).color(BORDER_COLOR));
+                ui.add_space(8.0);
+
+                let status_detail = if is_custom {
+                    format!(
+                        "Tailord actively controlling fans · Applied Target: CPU {}% ({}°C)  ·  GPU {}% ({}°C)",
+                        app.cpu_fan_pct, app.cpu_temp, app.gpu_fan_pct, app.gpu_temp
+                    )
+                } else {
+                    format!(
+                        "Curve on standby · Evaluated Target: CPU {}% ({}°C)  ·  GPU {}% ({}°C)",
+                        cpu_target, app.cpu_temp, gpu_target, app.gpu_temp
+                    )
+                };
+
+                ui.label(
+                    egui::RichText::new(status_detail)
+                        .size(11.0)
+                        .color(if is_custom { TEXT_PRIMARY } else { TEXT_SECONDARY }),
+                );
+            });
+        });
+}
+
+fn render_fan_telemetry_column(app: &AcerApp, ui: &mut egui::Ui) {
+    ui.vertical(|ui| {
+        ui.horizontal(|ui| {
+            ui.label(
+                egui::RichText::new("REAL-TIME FAN TELEMETRY")
+                    .size(11.0)
+                    .strong()
+                    .color(TEXT_DIM),
+            );
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if app.fan_mode == FanMode::Custom {
+                    ui.label(
+                        egui::RichText::new("HARDWARE DRIVEN")
+                            .size(10.0)
+                            .strong()
+                            .color(ACCENT_GREEN),
+                    );
+                }
+            });
+        });
+
+        ui.add_space(8.0);
+
+        let (cpu_target, gpu_target) = app.calculate_curve_targets();
+
+        render_fan_metric_row(
+            ui,
+            "CPU Fan",
+            app.cpu_fan_rpm,
+            app.cpu_fan_pct,
+            ACCENT_BLUE,
+            app.fan_mode,
+            cpu_target,
+        );
+
+        ui.add_space(12.0);
+
+        render_fan_metric_row(
+            ui,
+            "GPU Fan",
+            app.gpu_fan_rpm,
+            app.gpu_fan_pct,
+            ACCENT_GREEN,
+            app.fan_mode,
+            gpu_target,
+        );
+    });
+}
+
+fn render_fan_metric_row(
+    ui: &mut egui::Ui,
+    name: &str,
+    rpm: u32,
+    pct: u32,
+    accent: Color32,
+    fan_mode: FanMode,
+    target_pct: u32,
+) {
     egui::Frame::new()
         .fill(BG_CARD_SUBTLE)
         .stroke(Stroke::new(1.0, BORDER_COLOR))
@@ -528,14 +490,247 @@ fn render_fan_metric_row(ui: &mut egui::Ui, name: &str, rpm: u32, pct: u32, acce
             ui.horizontal(|ui| {
                 ui.label(egui::RichText::new(name).size(13.0).strong().color(TEXT_PRIMARY));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(egui::RichText::new(format!("{} %", pct)).size(13.0).strong().color(accent));
+                    ui.label(
+                        egui::RichText::new(format!("{} %", pct))
+                            .size(13.0)
+                            .strong()
+                            .color(accent),
+                    );
                     ui.add_space(8.0);
-                    ui.label(egui::RichText::new(format!("{} RPM", rpm)).size(13.0).color(TEXT_SECONDARY));
+                    ui.label(
+                        egui::RichText::new(format!("{} RPM", rpm))
+                            .size(13.0)
+                            .color(TEXT_SECONDARY),
+                    );
+                    ui.add_space(8.0);
+                    let mode_badge = match fan_mode {
+                        FanMode::Custom => format!("Target: {}% (Curve)", target_pct),
+                        FanMode::Automatic => "EC Auto".to_string(),
+                        FanMode::Maximum => "Max (100%)".to_string(),
+                        FanMode::Turbo => "Turbo (100%)".to_string(),
+                    };
+                    ui.label(egui::RichText::new(mode_badge).size(10.0).color(TEXT_DIM));
                 });
             });
             ui.add_space(6.0);
             render_clean_progress_bar(ui, pct, accent);
         });
+}
+
+fn render_curve_editor(app: &mut AcerApp, ui: &mut egui::Ui) {
+    ui.vertical(|ui| {
+        // Tab switcher
+        ui.horizontal(|ui| {
+            ui.label(
+                egui::RichText::new("CURVE CONFIGURATION")
+                    .size(11.0)
+                    .strong()
+                    .color(TEXT_DIM),
+            );
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let is_cpu = app.active_curve_tab == 0;
+                if ui.selectable_label(!is_cpu, "GPU Curve").clicked() {
+                    app.active_curve_tab = 1;
+                    app.selected_node_idx = 2.min(app.gpu_curve_nodes.len().saturating_sub(1));
+                }
+                if ui.selectable_label(is_cpu, "CPU Curve").clicked() {
+                    app.active_curve_tab = 0;
+                    app.selected_node_idx = 2.min(app.cpu_curve_nodes.len().saturating_sub(1));
+                }
+            });
+        });
+
+        ui.add_space(8.0);
+
+        let is_cpu = app.active_curve_tab == 0;
+        let accent = if is_cpu { ACCENT_BLUE } else { ACCENT_GREEN };
+        let live_temp = if is_cpu { app.cpu_temp } else { app.gpu_temp };
+        let live_duty = if is_cpu { app.cpu_fan_pct } else { app.gpu_fan_pct };
+
+        // Render Graph Canvas
+        let (cur_temp, cur_speed, changed_by_canvas) = {
+            let nodes = if is_cpu {
+                &mut app.cpu_curve_nodes
+            } else {
+                &mut app.gpu_curve_nodes
+            };
+
+            let changed = render_clean_curve_graph(
+                ui,
+                nodes,
+                accent,
+                &mut app.selected_node_idx,
+                live_temp,
+                live_duty,
+            );
+            let idx = app.selected_node_idx.min(nodes.len().saturating_sub(1));
+            (nodes[idx].temp as u32, nodes[idx].speed as u32, changed)
+        };
+
+        ui.add_space(8.0);
+
+        // Status row below graph: Selected Point + Live Applied Target
+        let (cpu_target, gpu_target) = app.calculate_curve_targets();
+        let active_applied = if is_cpu { cpu_target } else { gpu_target };
+        let is_custom_active = app.fan_mode == FanMode::Custom;
+
+        ui.horizontal(|ui| {
+            let idx = app.selected_node_idx;
+            ui.label(
+                egui::RichText::new(format!("Node #{}: {} ℃ ➔ {} %", idx + 1, cur_temp, cur_speed))
+                    .size(11.5)
+                    .strong()
+                    .color(TEXT_PRIMARY),
+            );
+
+            ui.add_space(6.0);
+            ui.label(egui::RichText::new("·").color(BORDER_COLOR));
+            ui.add_space(6.0);
+
+            let (badge_bg, badge_fg, badge_text) = if is_custom_active {
+                (
+                    Color32::from_rgb(18, 38, 26),
+                    ACCENT_GREEN,
+                    format!("Applied: {}% (at {}℃)", active_applied, live_temp),
+                )
+            } else {
+                (
+                    BG_CARD_SUBTLE,
+                    TEXT_SECONDARY,
+                    format!("Target: {}% (at {}℃)", active_applied, live_temp),
+                )
+            };
+
+            egui::Frame::new()
+                .fill(badge_bg)
+                .stroke(Stroke::new(1.0, badge_fg))
+                .corner_radius(4)
+                .inner_margin(egui::Margin::symmetric(6, 2))
+                .show(ui, |ui| {
+                    ui.label(
+                        egui::RichText::new(badge_text)
+                            .size(10.5)
+                            .strong()
+                            .color(badge_fg),
+                    );
+                });
+        });
+
+        ui.add_space(6.0);
+
+        // Fine-tune sliders for selected node
+        let mut fine_tune_changed = false;
+        {
+            let nodes = if is_cpu {
+                &mut app.cpu_curve_nodes
+            } else {
+                &mut app.gpu_curve_nodes
+            };
+            let idx = app.selected_node_idx.min(nodes.len().saturating_sub(1));
+
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new("Fine-tune:").size(11.0).color(TEXT_DIM));
+
+                let min_t = if idx > 0 { nodes[idx - 1].temp + 1.0 } else { 20.0 };
+                let max_t = if idx + 1 < nodes.len() { nodes[idx + 1].temp - 1.0 } else { 100.0 };
+                let max_t = max_t.max(min_t);
+
+                ui.label(egui::RichText::new("Temp").size(11.0).color(TEXT_SECONDARY));
+                let mut temp_val = nodes[idx].temp;
+                let t_slider = ui.add(
+                    egui::Slider::new(&mut temp_val, min_t..=max_t)
+                        .suffix(" °C")
+                        .show_value(true),
+                );
+                if t_slider.changed() {
+                    nodes[idx].temp = temp_val.round();
+                    fine_tune_changed = true;
+                }
+
+                ui.add_space(8.0);
+                ui.label(egui::RichText::new("Duty").size(11.0).color(TEXT_SECONDARY));
+                let mut speed_val = nodes[idx].speed;
+                let s_slider = ui.add(
+                    egui::Slider::new(&mut speed_val, 0.0..=100.0)
+                        .suffix(" %")
+                        .show_value(true),
+                );
+                if s_slider.changed() {
+                    nodes[idx].speed = speed_val.round();
+                    fine_tune_changed = true;
+                }
+            });
+        }
+
+        ui.add_space(8.0);
+
+        // Action Buttons Row: "Sync to Tailord / Save" + "Reset Curve"
+        ui.horizontal(|ui| {
+            let sync_btn = ui.add(
+                egui::Button::new(
+                    egui::RichText::new("Sync to Tailord / Save")
+                        .size(11.5)
+                        .strong()
+                        .color(Color32::WHITE),
+                )
+                .fill(ACCENT_BLUE)
+                .corner_radius(6)
+                .min_size(Vec2::new(144.0, 26.0)),
+            );
+            if sync_btn.clicked() {
+                app.sync_custom_curve_to_tailord();
+            }
+
+            ui.add_space(6.0);
+
+            let reset_btn = ui.add(
+                egui::Button::new(
+                    egui::RichText::new("Reset Curve")
+                        .size(11.5)
+                        .color(TEXT_SECONDARY),
+                )
+                .fill(BG_CARD_SUBTLE)
+                .stroke(Stroke::new(1.0, BORDER_COLOR))
+                .corner_radius(6)
+                .min_size(Vec2::new(88.0, 26.0)),
+            );
+            if reset_btn.clicked() {
+                app.reset_active_curve();
+            }
+        });
+
+        // Reactive hardware evaluation & dispatch if canvas or slider changed
+        if changed_by_canvas || fine_tune_changed {
+            app.apply_custom_curve();
+        }
+
+        // Feedback notification message banner
+        if let Some(ref msg) = app.curve_feedback {
+            let show = if let Some(time) = app.curve_feedback_time {
+                time.elapsed().as_secs() < 8
+            } else {
+                true
+            };
+
+            if show {
+                ui.add_space(6.0);
+                egui::Frame::new()
+                    .fill(Color32::from_rgb(16, 32, 22))
+                    .stroke(Stroke::new(1.0, ACCENT_GREEN))
+                    .corner_radius(6)
+                    .inner_margin(egui::Margin::symmetric(10, 5))
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                egui::RichText::new(msg)
+                                    .size(11.0)
+                                    .color(ACCENT_GREEN),
+                            );
+                        });
+                    });
+            }
+        }
+    });
 }
 
 // ============================================================================
@@ -603,10 +798,9 @@ fn render_display_card(app: &mut AcerApp, ui: &mut egui::Ui) {
                     app.controller.set_night_light(app.blue_light_filter, app.blue_light_level);
                 }
 
-                if app.blue_light_filter {
-                    if ui.add(egui::Slider::new(&mut app.blue_light_level, 0.0..=10.0).text("Level")).changed() {
+                if app.blue_light_filter
+                    && ui.add(egui::Slider::new(&mut app.blue_light_level, 0.0..=10.0).text("Level")).changed() {
                         app.controller.set_night_light(true, app.blue_light_level);
-                    }
                 }
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -665,20 +859,32 @@ fn render_clean_progress_bar(ui: &mut egui::Ui, pct: u32, fill_col: Color32) {
 
 fn render_clean_curve_graph(
     ui: &mut egui::Ui,
-    nodes: &mut Vec<FanCurveNode>,
+    nodes: &mut [FanCurveNode],
     accent: Color32,
     selected_idx: &mut usize,
-) {
-    let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 120.0), egui::Sense::click_and_drag());
+    live_temp: u32,
+    live_duty: u32,
+) -> bool {
+    let (rect, response) = ui.allocate_exact_size(
+        Vec2::new(ui.available_width(), 130.0),
+        egui::Sense::click_and_drag(),
+    );
     let painter = ui.painter_at(rect);
 
     painter.rect_filled(rect, 8.0, BG_CARD_SUBTLE);
     painter.rect_stroke(rect, 8.0, Stroke::new(1.0, BORDER_COLOR), egui::StrokeKind::Inside);
 
-    let grid_stroke = Stroke::new(0.5, BORDER_COLOR);
+    // Horizontal grid lines (25%, 50%, 75%)
+    let grid_stroke = Stroke::new(0.5, Color32::from_rgba_unmultiplied(48, 54, 61, 160));
     for y_pct in [0.25, 0.5, 0.75] {
         let y = rect.max.y - (rect.height() * y_pct);
         painter.line_segment([Pos2::new(rect.min.x, y), Pos2::new(rect.max.x, y)], grid_stroke);
+    }
+
+    // Vertical temperature guides (40°C, 60°C, 80°C)
+    for t in [40.0, 60.0, 80.0] {
+        let x = rect.min.x + ((t - 20.0) / 80.0) * rect.width();
+        painter.line_segment([Pos2::new(x, rect.min.y), Pos2::new(x, rect.max.y)], grid_stroke);
     }
 
     let node_to_screen = |node: &FanCurveNode| -> Pos2 {
@@ -687,42 +893,108 @@ fn render_clean_curve_graph(
         Pos2::new(x, y)
     };
 
+    // Draw shaded area below curve
+    if nodes.len() >= 2 {
+        let mut area_points = Vec::with_capacity(nodes.len() + 2);
+        let first_screen = node_to_screen(&nodes[0]);
+        let last_screen = node_to_screen(&nodes[nodes.len() - 1]);
+
+        area_points.push(Pos2::new(first_screen.x, rect.max.y));
+        for node in nodes.iter() {
+            area_points.push(node_to_screen(node));
+        }
+        area_points.push(Pos2::new(last_screen.x, rect.max.y));
+
+        let fill_color = Color32::from_rgba_unmultiplied(accent.r(), accent.g(), accent.b(), 22);
+        painter.add(egui::Shape::convex_polygon(area_points, fill_color, Stroke::NONE));
+    }
+
+    // Connect nodes with line segments
     for i in 0..nodes.len().saturating_sub(1) {
         let p1 = node_to_screen(&nodes[i]);
         let p2 = node_to_screen(&nodes[i + 1]);
-        painter.line_segment([p1, p2], Stroke::new(2.0, accent));
+        painter.line_segment([p1, p2], Stroke::new(2.5, accent));
     }
 
+    // Draw live operating point indicator if within range
+    if (20..=100).contains(&live_temp) {
+        let live_x = rect.min.x + ((live_temp as f32 - 20.0) / 80.0) * rect.width();
+        let live_y = rect.max.y - (live_duty.min(100) as f32 / 100.0) * rect.height();
+
+        // Vertical indicator line
+        painter.line_segment(
+            [Pos2::new(live_x, rect.min.y), Pos2::new(live_x, rect.max.y)],
+            Stroke::new(1.0, Color32::from_rgba_unmultiplied(210, 153, 34, 120)),
+        );
+
+        // Operating point marker
+        painter.circle_stroke(
+            Pos2::new(live_x, live_y),
+            7.0,
+            Stroke::new(1.5, ACCENT_ORANGE),
+        );
+        painter.circle_filled(Pos2::new(live_x, live_y), 3.5, Color32::WHITE);
+    }
+
+    // Draw node control points
     for (i, node) in nodes.iter().enumerate() {
         let p = node_to_screen(node);
         let is_sel = *selected_idx == i;
         if is_sel {
-            painter.circle_stroke(p, 8.0, Stroke::new(2.0, accent));
+            painter.circle_stroke(p, 9.0, Stroke::new(2.0, accent));
         }
-        painter.circle_filled(p, 4.5, if is_sel { Color32::WHITE } else { accent });
+        painter.circle_filled(
+            p,
+            if is_sel { 5.5 } else { 4.0 },
+            if is_sel { Color32::WHITE } else { accent },
+        );
     }
 
+    let mut modified = false;
+
     if let Some(mouse_pos) = response.interact_pointer_pos() {
-        if response.dragged() {
-            let idx = *selected_idx.min(&mut (nodes.len() - 1));
+        // When drag starts or on click, select the closest node
+        if response.drag_started() || (response.clicked() && !response.dragged()) {
+            let mut closest_idx = *selected_idx;
+            let mut min_dist = f32::MAX;
+            for (i, node) in nodes.iter().enumerate() {
+                let p = node_to_screen(node);
+                let dist = (p.x - mouse_pos.x).hypot(p.y - mouse_pos.y);
+                if dist < min_dist {
+                    min_dist = dist;
+                    closest_idx = i;
+                }
+            }
+            if min_dist < 40.0 || response.clicked() {
+                *selected_idx = closest_idx;
+            }
+        }
+
+        if response.dragged() && !nodes.is_empty() {
+            let idx = (*selected_idx).min(nodes.len().saturating_sub(1));
             let new_temp = (20.0 + ((mouse_pos.x - rect.min.x) / rect.width()) * 80.0).clamp(20.0, 100.0);
             let new_speed = (((rect.max.y - mouse_pos.y) / rect.height()) * 100.0).clamp(0.0, 100.0);
 
-            let min_temp = if idx > 0 { nodes[idx - 1].temp + 2.0 } else { 20.0 };
-            let max_temp = if idx + 1 < nodes.len() { nodes[idx + 1].temp - 2.0 } else { 100.0 };
+            let min_temp = if idx > 0 { nodes[idx - 1].temp + 1.0 } else { 20.0 };
+            let max_temp = if idx + 1 < nodes.len() { nodes[idx + 1].temp - 1.0 } else { 100.0 };
+            let max_temp = max_temp.max(min_temp);
 
-            nodes[idx].temp = new_temp.clamp(min_temp, max_temp);
-            nodes[idx].speed = new_speed;
-        } else if response.clicked() {
-            for (i, node) in nodes.iter().enumerate() {
-                let p = node_to_screen(node);
-                if (p.x - mouse_pos.x).abs() < 14.0 && (p.y - mouse_pos.y).abs() < 14.0 {
-                    *selected_idx = i;
-                    break;
-                }
+            let rounded_temp = new_temp.clamp(min_temp, max_temp).round();
+            let rounded_speed = new_speed.clamp(0.0, 100.0).round();
+
+            if (nodes[idx].temp - rounded_temp).abs() > 0.01 || (nodes[idx].speed - rounded_speed).abs() > 0.01 {
+                nodes[idx].temp = rounded_temp;
+                nodes[idx].speed = rounded_speed;
+                modified = true;
             }
         }
+
+        if response.drag_stopped() {
+            modified = true;
+        }
     }
+
+    modified
 }
 
 fn temp_to_color(temp: u32) -> Color32 {
@@ -805,5 +1077,135 @@ mod tests {
         let out_of_bounds_t = 90.0f32;
         nodes[idx].temp = out_of_bounds_t.clamp(min_t, max_t);
         assert_eq!(nodes[idx].temp, 79.0);
+    }
+
+    #[test]
+    fn test_boundary_clamping_first_middle_last() {
+        let nodes = vec![
+            FanCurveNode::new(25.0, 20.0),
+            FanCurveNode::new(50.0, 40.0),
+            FanCurveNode::new(75.0, 70.0),
+            FanCurveNode::new(95.0, 100.0),
+        ];
+
+        // 1. Node 0 clamping
+        let idx = 0;
+        let min_t = 20.0;
+        let max_t = nodes[idx + 1].temp - 1.0;
+        assert_eq!(10.0f32.clamp(min_t, max_t), 20.0);
+        assert_eq!(60.0f32.clamp(min_t, max_t), 49.0);
+
+        // 2. Middle node clamping
+        let idx = 2;
+        let min_t = nodes[idx - 1].temp + 1.0;
+        let max_t = nodes[idx + 1].temp - 1.0;
+        assert_eq!(40.0f32.clamp(min_t, max_t), 51.0);
+        assert_eq!(98.0f32.clamp(min_t, max_t), 94.0);
+
+        // 3. Last node clamping
+        let idx = nodes.len() - 1;
+        let min_t = nodes[idx - 1].temp + 1.0;
+        let max_t = 100.0;
+        assert_eq!(70.0f32.clamp(min_t, max_t), 76.0);
+        assert_eq!(110.0f32.clamp(min_t, max_t), 100.0);
+    }
+
+    #[test]
+    fn test_sync_custom_curve_to_tailord() {
+        let prev_active = std::process::Command::new("busctl")
+            .args(["call", "com.tux.Tailor", "/com/tux/Tailor", "com.tux.Tailor.Profiles", "GetActiveProfileName"])
+            .output()
+            .ok()
+            .and_then(|o| crate::backend::parse_busctl_string(&String::from_utf8_lossy(&o.stdout)))
+            .unwrap_or_else(|| "default".to_string());
+
+        let mut app = AcerApp::default();
+        app.fan_mode = FanMode::Automatic;
+        app.cpu_temp = 50;
+        app.gpu_temp = 45;
+
+        app.sync_custom_curve_to_tailord();
+
+        assert_eq!(app.fan_mode, FanMode::Custom);
+        assert!(app.curve_feedback.is_some());
+        let fb = app.curve_feedback.as_ref().unwrap();
+        assert!(fb.contains("Locked in & synced to tailord") || fb.contains("Saved to disk"));
+        assert!(app.cpu_fan_pct > 0);
+        assert_eq!(app.cpu_fan_pct, app.last_applied_cpu_pct);
+
+        let _ = std::process::Command::new("busctl")
+            .args(["call", "com.tux.Tailor", "/com/tux/Tailor", "com.tux.Tailor.Profiles", "SetActiveProfileName", "s", &prev_active])
+            .output();
+    }
+
+    #[test]
+    fn test_apply_custom_curve_live() {
+        let mut app = AcerApp::default();
+        app.fan_mode = FanMode::Custom;
+        app.cpu_temp = 65;
+        app.gpu_temp = 60;
+
+        // Modify a curve node to high speed
+        for node in app.cpu_curve_nodes.iter_mut() {
+            if (node.temp - 65.0).abs() < 10.0 {
+                node.speed = 90.0;
+            }
+        }
+
+        app.apply_custom_curve();
+        assert!(app.cpu_fan_pct >= 80);
+        assert!(app.curve_feedback.is_some());
+        let fb = app.curve_feedback.as_ref().unwrap();
+        assert!(fb.contains("Live applied"));
+    }
+
+    #[test]
+    fn test_reset_active_curve() {
+        let mut app = AcerApp::default();
+        app.active_curve_tab = 0;
+        app.cpu_curve_nodes[0].speed = 99.0;
+
+        app.reset_active_curve();
+        assert_eq!(app.cpu_curve_nodes[0].speed, 20.0);
+        assert!(app.curve_feedback.is_some());
+
+        // Test GPU curve reset
+        app.active_curve_tab = 1;
+        app.gpu_curve_nodes[0].speed = 88.0;
+        app.reset_active_curve();
+        assert_eq!(app.gpu_curve_nodes[0].speed, 0.0);
+    }
+
+    #[test]
+    fn test_fan_mode_feedback_messages() {
+        let mut app = AcerApp::default();
+
+        app.set_fan_mode(FanMode::Automatic);
+        assert!(app.curve_feedback.as_ref().unwrap().contains("Auto Curve"));
+
+        app.set_fan_mode(FanMode::Maximum);
+        assert!(app.curve_feedback.as_ref().unwrap().contains("Max fan mode"));
+
+        app.set_fan_mode(FanMode::Turbo);
+        assert!(app.curve_feedback.as_ref().unwrap().contains("Turbo fan mode"));
+
+        app.set_fan_mode(FanMode::Custom);
+        assert!(app.curve_feedback.as_ref().unwrap().contains("Custom Curve"));
+    }
+
+    #[test]
+    fn test_telemetry_temp_shift_updates_curve_targets() {
+        let mut app = AcerApp::default();
+        app.fan_mode = FanMode::Custom;
+
+        app.cpu_temp = 30;
+        app.apply_custom_curve();
+        let cool_pct = app.cpu_fan_pct;
+
+        app.cpu_temp = 85;
+        app.apply_custom_curve();
+        let hot_pct = app.cpu_fan_pct;
+
+        assert!(hot_pct > cool_pct);
     }
 }
