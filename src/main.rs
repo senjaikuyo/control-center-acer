@@ -407,14 +407,17 @@ impl eframe::App for AcerApp {
                     .color(Color32::WHITE),
             );
 
-            // Right utility info
+            // Right window controls (as in real app)
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.add_space(8.0);
-                ui.label(
-                    egui::RichText::new("Clevo Control Center 3.0 • Arch Linux")
-                        .size(11.0)
-                        .color(text_muted),
-                );
+                let btn_col = Color32::from_rgb(180, 185, 195);
+                ui.label(egui::RichText::new("✕").size(13.0).color(btn_col));
+                ui.add_space(8.0);
+                ui.label(egui::RichText::new("▢").size(13.0).color(btn_col));
+                ui.add_space(8.0);
+                ui.label(egui::RichText::new("—").size(13.0).color(btn_col));
+                ui.add_space(14.0);
+                ui.label(egui::RichText::new("👤").size(13.0).color(btn_col));
             });
         });
 
@@ -743,6 +746,17 @@ impl eframe::App for AcerApp {
                     });
                 });
         });
+
+        // Bottom scroll/pagination bar (exact match to original app)
+        ui.add_space(4.0);
+        let (scroll_rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 10.0), egui::Sense::hover());
+        let sp = ui.painter_at(scroll_rect);
+        sp.rect_filled(scroll_rect, 3.0, Color32::from_rgb(18, 22, 28));
+        let thumb_rect = Rect::from_min_size(
+            Pos2::new(scroll_rect.min.x + 40.0, scroll_rect.min.y + 1.0),
+            Vec2::new(scroll_rect.width() * 0.45, scroll_rect.height() - 2.0),
+        );
+        sp.rect_filled(thumb_rect, 3.0, Color32::from_rgb(45, 54, 68));
     }
 }
 
