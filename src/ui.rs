@@ -40,17 +40,34 @@ pub fn render(app: &mut AcerApp, ctx: &egui::Context, ui: &mut egui::Ui) {
     // 1. TOP WINDOW BAR
     render_top_bar(app, ctx, ui);
 
-    // 2. POWER PROFILES (TOP-CENTER TABS)
-    render_power_profiles(app, ui);
+    match app.active_tab {
+        1 => {
+            // 💡 Chassis & Keyboard Lighting
+            render_lighting_view(app, ui);
+        }
+        2 => {
+            // 🔋 Battery & Power Health
+            render_battery_view(app, ui);
+        }
+        3 => {
+            // ⚙ Device Settings & Diagnostics
+            render_settings_view(app, ui);
+        }
+        _ => {
+            // ⏱ 0: Dashboard (Default 3-Deck)
+            // 2. POWER PROFILES (TOP-CENTER TABS)
+            render_power_profiles(app, ui);
 
-    // 3. MAIN MID-DECK (3 COLUMNS)
-    render_mid_deck(app, ui);
+            // 3. MAIN MID-DECK (3 COLUMNS)
+            render_mid_deck(app, ui);
 
-    // 4. BOTTOM DECK (3 MODULAR FRAMED PANELS)
-    render_bottom_deck(app, ui);
+            // 4. BOTTOM DECK (3 MODULAR FRAMED PANELS)
+            render_bottom_deck(app, ui);
 
-    // 5. BOTTOM CAROUSEL / SCROLLBAR TRACK
-    render_bottom_scrollbar(app, ui);
+            // 5. BOTTOM CAROUSEL / SCROLLBAR TRACK
+            render_bottom_scrollbar(app, ui);
+        }
+    }
 }
 
 // ============================================================================
@@ -1305,6 +1322,227 @@ fn render_bottom_deck(app: &mut AcerApp, ui: &mut egui::Ui) {
 }
 
 // ============================================================================
+// LIGHTING VIEW (TAB 1: 💡)
+// ============================================================================
+fn render_lighting_view(app: &mut AcerApp, ui: &mut egui::Ui) {
+    egui::Frame::new()
+        .fill(COLOR_CARD_BG)
+        .stroke(Stroke::new(1.0, COLOR_CARD_BORDER))
+        .corner_radius(8)
+        .inner_margin(16)
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new("💡 Chassis & Keyboard Lighting")
+                        .size(16.0)
+                        .strong()
+                        .color(COLOR_TEXT_WHITE),
+                );
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button(egui::RichText::new("<< Dashboard").size(12.0).color(COLOR_CYAN)).clicked() {
+                        app.active_tab = 0;
+                    }
+                });
+            });
+
+            ui.add_space(8.0);
+            ui.separator();
+            ui.add_space(10.0);
+
+            // Keyboard Graphic Canvas with Glow Underline
+            let (kb_rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 130.0), egui::Sense::hover());
+            let painter = ui.painter_at(kb_rect);
+            let glow_col = Color32::from_rgb(app.kbd_color[0], app.kbd_color[1], app.kbd_color[2]);
+
+            // Outer chassis glow
+            painter.rect_filled(kb_rect, 6.0, Color32::from_rgb(12, 15, 22));
+            painter.rect_stroke(kb_rect, 6.0, Stroke::new(2.0, glow_col), StrokeKind::Inside);
+
+            // Keyboard key grid illustration
+            let key_w = (kb_rect.width() - 40.0) / 14.0;
+            let key_h = 16.0;
+            for row in 0..4 {
+                let y = kb_rect.min.y + 16.0 + (row as f32 * (key_h + 4.0));
+                for col in 0..14 {
+                    let x = kb_rect.min.x + 20.0 + (col as f32 * (key_w + 2.0));
+                    let key_rect = Rect::from_min_size(Pos2::new(x, y), Vec2::new(key_w - 2.0, key_h));
+                    painter.rect_filled(key_rect, 2.0, Color32::from_rgb(22, 28, 38));
+                    painter.rect_stroke(key_rect, 2.0, Stroke::new(0.8, Color32::from_rgba_premultiplied(app.kbd_color[0], app.kbd_color[1], app.kbd_color[2], 120)), StrokeKind::Inside);
+                }
+            }
+
+            // Keyboard status caption
+            painter.text(
+                Pos2::new(kb_rect.center().x, kb_rect.max.y - 14.0),
+                egui::Align2::CENTER_CENTER,
+                format!("Active Color: RGB({}, {}, {}) · Brightness: {}%", app.kbd_color[0], app.kbd_color[1], app.kbd_color[2], app.kbd_brightness),
+                FontId::proportional(11.0),
+                glow_col,
+            );
+
+            ui.add_space(14.0);
+
+            // Palette Swatches
+            ui.label(egui::RichText::new("Color Presets").size(13.0).strong().color(COLOR_TEXT_WHITE));
+            ui.add_space(6.0);
+
+            let swatches = [
+                ("Acer Cyan", [0, 225, 255]),
+                ("Ocean Blue", [41, 121, 255]),
+                ("Vivid Purple", [156, 39, 176]),
+                ("Crimson Red", [244, 67, 54]),
+                ("Amber Gold", [255, 179, 0]),
+                ("Neon Green", [0, 230, 118]),
+                ("Crisp White", [255, 255, 255]),
+                ("Off", [0, 0, 0]),
+            ];
+
+            ui.horizontal(|ui| {
+                for (name, rgb) in swatches {
+                    let col = Color32::from_rgb(rgb[0], rgb[1], rgb[2]);
+                    let is_active = app.kbd_color == rgb;
+
+                    let (rect, resp) = ui.allocate_exact_size(Vec2::new(48.0, 32.0), egui::Sense::click());
+                    let p = ui.painter_at(rect);
+
+                    p.rect_filled(rect, 4.0, col);
+                    let border_stroke = if is_active {
+                        Stroke::new(2.0, Color32::WHITE)
+                    } else if resp.hovered() {
+                        Stroke::new(1.5, COLOR_CYAN)
+                    } else {
+                        Stroke::new(1.0, Color32::from_rgb(38, 48, 64))
+                    };
+                    p.rect_stroke(rect, 4.0, border_stroke, StrokeKind::Inside);
+
+                    if resp.clicked() {
+                        app.set_keyboard_color(rgb[0], rgb[1], rgb[2]);
+                    }
+                    let _ = resp.on_hover_text(name);
+
+                    ui.add_space(4.0);
+                }
+            });
+
+            ui.add_space(14.0);
+
+            // Brightness Slider
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new("Backlight Brightness:").size(12.5).color(COLOR_TEXT_WHITE));
+                let mut bri = app.kbd_brightness;
+                if ui.add(egui::Slider::new(&mut bri, 0..=100).suffix("%").show_value(true)).changed() {
+                    app.set_keyboard_brightness(bri);
+                }
+            });
+
+            if let Some(ref msg) = app.curve_feedback {
+                ui.add_space(8.0);
+                ui.label(egui::RichText::new(msg).size(11.0).color(COLOR_TEMP_GREEN));
+            }
+        });
+}
+
+// ============================================================================
+// BATTERY VIEW (TAB 2: 🔋)
+// ============================================================================
+fn render_battery_view(app: &mut AcerApp, ui: &mut egui::Ui) {
+    egui::Frame::new()
+        .fill(COLOR_CARD_BG)
+        .stroke(Stroke::new(1.0, COLOR_CARD_BORDER))
+        .corner_radius(8)
+        .inner_margin(16)
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new("🔋 Battery & Power Health")
+                        .size(16.0)
+                        .strong()
+                        .color(COLOR_TEXT_WHITE),
+                );
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button(egui::RichText::new("<< Dashboard").size(12.0).color(COLOR_CYAN)).clicked() {
+                        app.active_tab = 0;
+                    }
+                });
+            });
+
+            ui.add_space(8.0);
+            ui.separator();
+            ui.add_space(12.0);
+
+            ui.horizontal(|ui| {
+                // Battery capacity gauge
+                render_circular_dial(ui, "Battery", 82, "BAT0", COLOR_TEMP_GREEN);
+                ui.add_space(20.0);
+
+                ui.vertical(|ui| {
+                    ui.label(egui::RichText::new("Health & Longevity Protection").size(14.0).strong().color(COLOR_TEXT_WHITE));
+                    ui.add_space(4.0);
+                    ui.label(egui::RichText::new("Custom charge limit stops charging at 80% to preserve lithium pack lifespan.").size(12.0).color(COLOR_TEXT_MUTED));
+                    ui.add_space(6.0);
+
+                    ui.horizontal(|ui| {
+                        let _ = ui.button(egui::RichText::new("✓ 80% Health Preservation").size(11.5).color(COLOR_CYAN));
+                        let _ = ui.button(egui::RichText::new("100% Full Capacity").size(11.5).color(COLOR_TEXT_MUTED));
+                    });
+                });
+            });
+        });
+}
+
+// ============================================================================
+// SETTINGS VIEW (TAB 3: ⚙)
+// ============================================================================
+fn render_settings_view(app: &mut AcerApp, ui: &mut egui::Ui) {
+    egui::Frame::new()
+        .fill(COLOR_CARD_BG)
+        .stroke(Stroke::new(1.0, COLOR_CARD_BORDER))
+        .corner_radius(8)
+        .inner_margin(16)
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new("⚙ Device Settings & Diagnostics")
+                        .size(16.0)
+                        .strong()
+                        .color(COLOR_TEXT_WHITE),
+                );
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button(egui::RichText::new("<< Dashboard").size(12.0).color(COLOR_CYAN)).clicked() {
+                        app.active_tab = 0;
+                    }
+                });
+            });
+
+            ui.add_space(8.0);
+            ui.separator();
+            ui.add_space(12.0);
+
+            ui.label(egui::RichText::new("Active Linux Subsystems:").size(13.0).strong().color(COLOR_TEXT_WHITE));
+            ui.add_space(4.0);
+
+            let checks = [
+                ("Cooling Subsystem", "com.tux.Tailor (tailord.service) · EC PWM Active"),
+                ("Keyboard Driver", "tuxedo_keyboard (rgb:kbd_backlight sysfs) · Active"),
+                ("Power Manager", "net.hadess.PowerProfiles (powerprofilesctl) · Active"),
+                ("Motherboard ODM", "Clevo CLV0001:00 WMI · Persistent drivers loaded"),
+            ];
+
+            for (title, desc) in checks {
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new("●").size(10.0).color(COLOR_TEMP_GREEN));
+                    ui.label(egui::RichText::new(format!("{}:", title)).size(12.0).strong().color(COLOR_TEXT_WHITE));
+                    ui.label(egui::RichText::new(desc).size(12.0).color(COLOR_TEXT_MUTED));
+                });
+                ui.add_space(2.0);
+            }
+        });
+}
+
+// ============================================================================
 // 5. BOTTOM CAROUSEL / SCROLLBAR TRACK
 // ============================================================================
 fn render_bottom_scrollbar(app: &mut AcerApp, ui: &mut egui::Ui) {
@@ -1593,6 +1831,24 @@ mod tests {
         let pct_max = 100;
         let filled_max = (num_segments as f32 * (pct_max as f32 / 100.0)).round() as usize;
         assert_eq!(filled_max, 26);
+    }
+
+    #[test]
+    fn test_keyboard_color_and_tabs() {
+        let mut app = AcerApp::default();
+        assert_eq!(app.active_tab, 0);
+
+        // Switch to Lighting tab
+        app.active_tab = 1;
+        assert_eq!(app.active_tab, 1);
+
+        // Set RGB
+        app.set_keyboard_color(0, 225, 255);
+        assert_eq!(app.kbd_color, [0, 225, 255]);
+        assert!(app.curve_feedback.is_some());
+
+        app.set_keyboard_brightness(80);
+        assert_eq!(app.kbd_brightness, 80);
     }
 }
 

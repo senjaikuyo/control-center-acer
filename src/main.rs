@@ -69,6 +69,11 @@ pub struct AcerApp {
     pub blue_light_level: f32,
     pub display_preset: usize,
 
+    // Keyboard lighting & backlights
+    pub kbd_color: [u8; 3],
+    pub kbd_brightness: u8,
+    pub kbd_effect: usize,
+
     // Bottom carousel / scrollbar
     pub scroll_pos: f32,
 
@@ -132,6 +137,10 @@ impl Default for AcerApp {
             blue_light_level: 0.0,
             display_preset: 0,
 
+            kbd_color: [0, 225, 255],
+            kbd_brightness: 100,
+            kbd_effect: 0,
+
             scroll_pos: 0.0,
 
             controller: HardwareController::new(),
@@ -141,6 +150,12 @@ impl Default for AcerApp {
         app.load_curves_from_disk();
         if let Some(profile) = backend::get_active_power_profile() {
             app.power_mode = profile;
+        }
+        if let Some((r, g, b)) = app.controller.get_keyboard_color() {
+            app.kbd_color = [r, g, b];
+        }
+        if let Some(bri) = app.controller.get_keyboard_brightness() {
+            app.kbd_brightness = bri;
         }
         app.detect_hardware_names();
         app.update_hardware();
@@ -397,6 +412,18 @@ impl AcerApp {
 
     pub fn set_gpu_switch(&mut self, mode: GpuSwitchMode) {
         self.gpu_switch = mode;
+    }
+
+    pub fn set_keyboard_color(&mut self, r: u8, g: u8, b: u8) {
+        self.kbd_color = [r, g, b];
+        self.controller.set_keyboard_color(r, g, b);
+        self.curve_feedback = Some(format!("✓ Keyboard RGB: ({}, {}, {})", r, g, b));
+        self.curve_feedback_time = Some(Instant::now());
+    }
+
+    pub fn set_keyboard_brightness(&mut self, pct: u8) {
+        self.kbd_brightness = pct;
+        self.controller.set_keyboard_brightness(pct);
     }
 }
 
