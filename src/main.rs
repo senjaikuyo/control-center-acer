@@ -110,7 +110,7 @@ impl Default for AcerApp {
             active_curve_tab: 0,
             cpu_curve_nodes: backend::default_cpu_curve(),
             gpu_curve_nodes: backend::default_gpu_curve(),
-            selected_node_idx: 2,
+            selected_node_idx: 0,
             curve_feedback: None,
             curve_feedback_time: None,
             last_applied_cpu_pct: 35,
@@ -165,8 +165,15 @@ impl AcerApp {
             && let Ok(content) = fs::read_to_string(path)
             && let Some((cpu, gpu)) = backend::parse_curve_nodes_from_str(&content)
         {
-            self.cpu_curve_nodes = cpu;
-            self.gpu_curve_nodes = gpu;
+            if cpu.len() == 2 && gpu.len() == 2 && cpu[0].temp < cpu[1].temp && gpu[0].temp < gpu[1].temp {
+                self.cpu_curve_nodes = cpu;
+                self.gpu_curve_nodes = gpu;
+            } else {
+                // Auto-migrate old multi-point configurations to the stable 2-point stepped model
+                self.cpu_curve_nodes = backend::default_cpu_curve();
+                self.gpu_curve_nodes = backend::default_gpu_curve();
+                self.save_curves_to_disk();
+            }
         }
     }
 
