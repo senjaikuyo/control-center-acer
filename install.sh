@@ -3,12 +3,17 @@ set -e
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
-echo "=== Building & Installing Acer Control Center (Rust) ==="
+echo "=== Building & Installing Acer Control Center (Qt6/QML Edition) ==="
 
-cargo build --release --manifest-path "$DIR/Cargo.toml"
+BUILD_DIR="$DIR/build"
+mkdir -p "$BUILD_DIR"
+cd "$BUILD_DIR"
+
+cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake --build . -j$(nproc)
 
 mkdir -p "$HOME/.local/bin"
-install -m 755 "$DIR/target/release/acer-control-center-rust" "$HOME/.local/bin/acer-control-center"
+install -m 755 "$BUILD_DIR/acer-control-center" "$HOME/.local/bin/acer-control-center"
 
 mkdir -p "$HOME/.local/share/icons/hicolor/64x64/apps" "$HOME/.local/share/pixmaps"
 if [ -f "$DIR/assets/acer-control-center.png" ]; then
@@ -21,7 +26,7 @@ cat << EOF > "$HOME/.local/share/applications/com.acer.ControlCenterLinux.deskto
 [Desktop Entry]
 Name=Acer Control Center
 GenericName=Hardware Control Center
-Comment=Acer / Clevo Control Center 3.0 for Linux (Rust Edition)
+Comment=Acer / Clevo Control Center 3.0 for Linux (Qt6/QML Edition)
 Exec=$HOME/.local/bin/acer-control-center
 Icon=acer-control-center
 Terminal=false
