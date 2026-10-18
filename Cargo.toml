@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 eframe = { version = "0.37", default-features = false, features = ["glow", "wayland", "x11", "default_fonts"] }
 egui = "0.37"
+libc = "0.2"
