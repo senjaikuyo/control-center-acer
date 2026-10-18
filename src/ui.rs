@@ -614,18 +614,37 @@ fn render_mid_deck(app: &mut AcerApp, ui: &mut egui::Ui) {
 // CENTER COLUMN: VIEW A - SPEEDOMETER TACHOMETER
 // ============================================================================
 fn render_speedometer_tachometer_view(app: &mut AcerApp, ui: &mut egui::Ui) {
-    ui.vertical_centered(|ui| {
+    let is_gpu = app.active_curve_tab == 1;
+    let mode_str = if is_gpu { "GPU Telemetry" } else { "CPU Telemetry" };
+
+    ui.horizontal(|ui| {
         ui.label(
-            egui::RichText::new("Processor Telemetry")
-                .size(13.0)
-                .color(COLOR_TEXT_MUTED),
+            egui::RichText::new(mode_str)
+                .size(13.5)
+                .strong()
+                .color(COLOR_TEXT_WHITE),
         );
+
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if ui.button(egui::RichText::new(">>").size(14.0).color(COLOR_GOLD)).on_hover_text("Open Custom Fan Curve Editor").clicked() {
+                app.set_fan_mode(FanMode::Custom);
+            }
+        });
     });
 
-    let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 175.0), egui::Sense::hover());
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 175.0), egui::Sense::click());
     let painter = ui.painter_at(rect);
     let center = Pos2::new(rect.center().x, rect.center().y + 10.0);
     let radius = 68.0;
+
+    // Toggle CPU/GPU on center hub click
+    if resp.clicked() {
+        if let Some(pos) = resp.interact_pointer_pos() {
+            if pos.distance(center) <= 35.0 {
+                app.active_curve_tab = if is_gpu { 0 } else { 1 };
+            }
+        }
+    }
 
     // 1. Electromagnetic Radiating Wave Lines (amber glow horizontal waves)
     for side in [-1.0f32, 1.0f32] {
@@ -647,7 +666,10 @@ fn render_speedometer_tachometer_view(app: &mut AcerApp, ui: &mut egui::Ui) {
         }
     }
 
-    // 2. Center "CPU" Hub with concentric rings and glowing badge
+    // 2. Center Hub with concentric rings and glowing badge
+    let hub_label = if is_gpu { "GPU" } else { "CPU" };
+    let hub_accent = if is_gpu { COLOR_CYAN } else { COLOR_GOLD };
+
     // Outer subtle purple aura
     painter.circle_stroke(
         center,
@@ -656,25 +678,30 @@ fn render_speedometer_tachometer_view(app: &mut AcerApp, ui: &mut egui::Ui) {
     );
     // Purple halo ring
     painter.circle_stroke(center, 28.0, Stroke::new(2.0, COLOR_PURPLE_GLOW));
-    // Cyan inner ring
-    painter.circle_stroke(center, 23.0, Stroke::new(2.0, COLOR_CYAN));
+    // Accent inner ring
+    painter.circle_stroke(center, 23.0, Stroke::new(2.0, hub_accent));
     // Dark core disc
     painter.circle_filled(center, 21.0, Color32::from_rgb(18, 22, 32));
     // Badge Label
     painter.text(
         center,
         egui::Align2::CENTER_CENTER,
-        "CPU",
+        hub_label,
         FontId::proportional(12.5),
         COLOR_TEXT_WHITE,
     );
 
-    // 3. Left Speedometer Arc (0 to 6 x1000 MHz)
+    // 3. Left Speedometer Arc
     let left_start = PI * 1.5; // top (12 o'clock)
-    let clk_ratio = (app.cpu_clock_mhz as f32 / 6000.0).clamp(0.0, 1.0);
+    let (clk_val, clk_max, clk_label) = if is_gpu {
+        (app.gpu_clock_mhz, 2500.0, "Clock speed\nx100 MHz")
+    } else {
+        (app.cpu_clock_mhz, 6000.0, "Clock speed\nx1000 MHz")
+    };
+    let clk_ratio = (clk_val as f32 / clk_max).clamp(0.0, 1.0);
     let needle_left_angle = left_start - (PI * clk_ratio);
 
-    // Arc track and scale tick marks (0, 1, 2, 3, 4, 5, 6)
+    // Arc track and scale tick marks
     for i in 0..15 {
         let a1 = left_start - (PI * (i as f32 / 15.0));
         let a2 = left_start - (PI * ((i + 1) as f32 / 15.0));
@@ -684,33 +711,36 @@ fn render_speedometer_tachometer_view(app: &mut AcerApp, ui: &mut egui::Ui) {
     }
 
     // Numbers along left arc
-    for val in 0..=6 {
-        let frac = val as f32 / 6.0;
+    let max_ticks = if is_gpu { 5 } else { 6 };
+    for val in 0..=max_ticks {
+        let frac = val as f32 / max_ticks as f32;
         let a = left_start - (PI * frac);
         let tick_p = Pos2::new(
             center.x + (radius + 12.0) * a.cos(),
             center.y + (radius + 12.0) * a.sin(),
         );
+        let tick_str = if is_gpu { (val * 5).to_string() } else { val.to_string() };
         painter.text(
             tick_p,
             egui::Align2::CENTER_CENTER,
-            val.to_string(),
+            tick_str,
             FontId::proportional(9.0),
             COLOR_TEXT_MUTED,
         );
     }
 
-    // Left Needle (Gold)
+    // Left Needle (Gold for CPU, Cyan for GPU)
     let n1_end = Pos2::new(
         center.x + (radius - 4.0) * needle_left_angle.cos(),
         center.y + (radius - 4.0) * needle_left_angle.sin(),
     );
-    painter.line_segment([center, n1_end], Stroke::new(2.5, COLOR_GOLD));
-    painter.circle_filled(center, 4.0, COLOR_GOLD);
+    painter.line_segment([center, n1_end], Stroke::new(2.5, hub_accent));
+    painter.circle_filled(center, 4.0, hub_accent);
 
     // 4. Right Temperature Arc (Green to Red Gradient)
     let right_start = PI * 1.5; // top (12 o'clock)
-    let temp_ratio = (app.cpu_temp as f32 / 100.0).clamp(0.0, 1.0);
+    let temp_val = if is_gpu { app.gpu_temp } else { app.cpu_temp };
+    let temp_ratio = (temp_val as f32 / 100.0).clamp(0.0, 1.0);
     let needle_right_angle = right_start + (PI * temp_ratio);
 
     for i in 0..15 {
@@ -729,27 +759,34 @@ fn render_speedometer_tachometer_view(app: &mut AcerApp, ui: &mut egui::Ui) {
         painter.line_segment([p1, p2], Stroke::new(4.0, col));
     }
 
-    // Right Needle (Cyan)
+    // Right Needle (Cyan for CPU, Gold for GPU)
+    let needle_right_col = if is_gpu { COLOR_GOLD } else { COLOR_CYAN };
     let n2_end = Pos2::new(
         center.x + (radius - 4.0) * needle_right_angle.cos(),
         center.y + (radius - 4.0) * needle_right_angle.sin(),
     );
-    painter.line_segment([center, n2_end], Stroke::new(2.5, COLOR_CYAN));
-    painter.circle_filled(center, 3.0, COLOR_CYAN);
+    painter.line_segment([center, n2_end], Stroke::new(2.5, needle_right_col));
+    painter.circle_filled(center, 3.0, needle_right_col);
 
     // Labels beneath arcs
     painter.text(
         Pos2::new(center.x - radius - 12.0, center.y + 12.0),
         egui::Align2::RIGHT_CENTER,
-        "Clock speed\nx1000 MHz",
+        clk_label,
         FontId::proportional(9.5),
         COLOR_TEXT_MUTED,
     );
 
+    let temp_label = if is_gpu && temp_val == 0 {
+        "SLEEP\nOptimus Standby".to_string()
+    } else {
+        format!("{} ℃\nTemperature", temp_val)
+    };
+
     painter.text(
         Pos2::new(center.x + radius + 12.0, center.y + 12.0),
         egui::Align2::LEFT_CENTER,
-        format!("{} ℃\nTemperature", app.cpu_temp),
+        temp_label,
         FontId::proportional(9.5),
         COLOR_TEXT_MUTED,
     );
@@ -1474,6 +1511,36 @@ mod tests {
         let out_of_bounds_t = 90.0f32;
         nodes[idx].temp = out_of_bounds_t.clamp(min_t, max_t);
         assert_eq!(nodes[idx].temp, 79.0);
+    }
+
+    #[test]
+    fn test_tachometer_telemetry_toggle() {
+        let mut app = AcerApp::default();
+        assert_eq!(app.active_curve_tab, 0); // CPU by default
+
+        // Switch to GPU telemetry
+        app.active_curve_tab = 1;
+        assert_eq!(app.active_curve_tab, 1);
+
+        // Switch back to CPU
+        app.active_curve_tab = 0;
+        assert_eq!(app.active_curve_tab, 0);
+    }
+
+    #[test]
+    fn test_striped_bar_bounds() {
+        let num_segments = 26;
+        let pct = 50;
+        let filled = (num_segments as f32 * (pct as f32 / 100.0)).round() as usize;
+        assert_eq!(filled, 13);
+
+        let pct_zero = 0;
+        let filled_zero = (num_segments as f32 * (pct_zero as f32 / 100.0)).round() as usize;
+        assert_eq!(filled_zero, 0);
+
+        let pct_max = 100;
+        let filled_max = (num_segments as f32 * (pct_max as f32 / 100.0)).round() as usize;
+        assert_eq!(filled_max, 26);
     }
 }
 
