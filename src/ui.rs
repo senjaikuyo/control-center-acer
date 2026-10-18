@@ -688,18 +688,19 @@ fn render_curve_editor(app: &mut AcerApp, ui: &mut egui::Ui) {
 
         ui.add_space(8.0);
 
-        // Action Buttons Row: "Sync to Tailord / Save" + "Reset Curve"
+        // Action Buttons Row: "Apply & Save to Fans" + "Reset Curve"
         ui.horizontal(|ui| {
+            let has_unsaved = app.curve_has_unsaved_changes;
             let sync_btn = ui.add(
                 egui::Button::new(
-                    egui::RichText::new("Sync to Tailord / Save")
+                    egui::RichText::new(if has_unsaved { "● Apply & Save to Fans" } else { "Apply & Save to Fans" })
                         .size(11.5)
                         .strong()
                         .color(Color32::WHITE),
                 )
-                .fill(ACCENT_BLUE)
+                .fill(if has_unsaved { ACCENT_ORANGE } else { ACCENT_BLUE })
                 .corner_radius(6)
-                .min_size(Vec2::new(144.0, 26.0)),
+                .min_size(Vec2::new(165.0, 26.0)),
             );
             if sync_btn.clicked() {
                 app.sync_custom_curve_to_tailord();
@@ -721,11 +722,20 @@ fn render_curve_editor(app: &mut AcerApp, ui: &mut egui::Ui) {
             if reset_btn.clicked() {
                 app.reset_active_curve();
             }
+
+            if has_unsaved {
+                ui.add_space(8.0);
+                ui.label(
+                    egui::RichText::new("Belum diterapkan — klik 'Apply & Save' untuk aktifkan")
+                        .size(11.0)
+                        .color(ACCENT_ORANGE),
+                );
+            }
         });
 
-        // Reactive hardware evaluation if canvas or slider changed
+        // Mark unsaved changes when dragging canvas or fine-tuning sliders (DO NOT apply immediately to hardware!)
         if changed_by_canvas || fine_tune_changed {
-            app.apply_custom_curve();
+            app.curve_has_unsaved_changes = true;
         }
 
         // Feedback notification message banner
@@ -1190,9 +1200,10 @@ mod tests {
         app.sync_custom_curve_to_tailord();
 
         assert_eq!(app.fan_mode, FanMode::Custom);
+        assert!(!app.curve_has_unsaved_changes);
         assert!(app.curve_feedback.is_some());
         let fb = app.curve_feedback.as_ref().unwrap();
-        assert!(fb.contains("Locked in & synced to tailord") || fb.contains("Saved to disk"));
+        assert!(fb.contains("Saved & applied to fans") || fb.contains("Saved to disk") || fb.contains("synced to tailord"));
         assert!(app.cpu_fan_pct > 0);
         assert_eq!(app.cpu_fan_pct, app.last_applied_cpu_pct);
 
@@ -1205,11 +1216,12 @@ mod tests {
     fn test_apply_custom_curve_live() {
         let mut app = AcerApp::default();
         app.fan_mode = FanMode::Custom;
+        app.cpu_curve_nodes = vec![
+            FanCurveNode::new(50.0, 60.0),
+            FanCurveNode::new(70.0, 90.0),
+        ];
         app.cpu_temp = 75;
         app.gpu_temp = 60;
-
-        // Point 2 at 75C set to 90%
-        app.cpu_curve_nodes[1].speed = 90.0;
 
         app.apply_custom_curve();
         assert_eq!(app.cpu_fan_pct, 90);

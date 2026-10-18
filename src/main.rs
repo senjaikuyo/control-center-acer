@@ -51,6 +51,7 @@ pub struct AcerApp {
     pub curve_feedback_time: Option<Instant>,
     pub last_applied_cpu_pct: u32,
     pub last_applied_gpu_pct: u32,
+    pub curve_has_unsaved_changes: bool,
 
     // Quick Toggles (Preferences)
     pub win_key_lock: bool,
@@ -115,6 +116,7 @@ impl Default for AcerApp {
             curve_feedback_time: None,
             last_applied_cpu_pct: 35,
             last_applied_gpu_pct: 0,
+            curve_has_unsaved_changes: false,
 
             win_key_lock: false,
             swap_win_fn: false,
@@ -236,10 +238,11 @@ impl AcerApp {
         self.last_applied_gpu_pct = gpu_pct;
 
         self.save_curves_to_disk();
+        self.curve_has_unsaved_changes = false;
         let status_prefix = if sync_res.is_ok() {
-            "✓ Locked in & synced to tailord"
+            "✓ Saved & applied to fans (synced to tailord)"
         } else {
-            "✓ Saved to disk & applied custom duty"
+            "✓ Saved to disk & applied to fans"
         };
         self.curve_feedback = Some(format!(
             "{}: CPU {}% · GPU {}%",
@@ -256,8 +259,8 @@ impl AcerApp {
             self.gpu_curve_nodes = backend::default_gpu_curve();
             self.selected_node_idx = self.selected_node_idx.min(self.gpu_curve_nodes.len().saturating_sub(1));
         }
-        self.apply_custom_curve();
-        self.curve_feedback = Some("Curve reset to default profile".to_string());
+        self.curve_has_unsaved_changes = true;
+        self.curve_feedback = Some("Curve reset to defaults in editor (click 'Apply & Save' to activate)".to_string());
         self.curve_feedback_time = Some(Instant::now());
     }
 
