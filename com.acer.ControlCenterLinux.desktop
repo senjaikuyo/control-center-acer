@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Acer Control Center
+Comment=Acer Control Center for Linux (Fan Control & Power Modes)
+Exec=/home/senjaikuyo/Projects/acer-control-center-linux/src/main.py
+Icon=/home/senjaikuyo/Projects/acer-control-center-linux/assets/icon.png
+Terminal=false
+Type=Application
+Categories=System;Settings;HardwareSettings;
+Keywords=acer;fan;speed;control;center;turbo;clevo;temperature;
+StartupNotify=true
