@@ -437,7 +437,14 @@ fn render_speedometer_gauge_panel(app: &mut AcerApp, ui: &mut egui::Ui) {
         );
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.button(egui::RichText::new(">>").size(13.0).color(COLOR_GOLD)).on_hover_text("Open Custom Fan Curve Editor").clicked() {
+            if ui.button(
+                egui::RichText::new("⚙ Atur Kurva >>")
+                    .size(11.0)
+                    .strong()
+                    .color(COLOR_GOLD),
+            )
+            .on_hover_text("Buka editor kurva kecepatan kipas kustom")
+            .clicked() {
                 app.set_fan_mode(FanMode::Custom);
             }
         });
@@ -575,7 +582,13 @@ fn render_custom_fan_curve_panel(app: &mut AcerApp, ui: &mut egui::Ui) {
         );
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.button(egui::RichText::new(">>").size(13.0).color(COLOR_GOLD)).on_hover_text("Return to standard gauge").clicked() {
+            if ui.button(
+                egui::RichText::new("<< Kembali")
+                    .size(11.0)
+                    .color(COLOR_GOLD),
+            )
+            .on_hover_text("Kembali ke tampilan speedometer / automatic")
+            .clicked() {
                 app.set_fan_mode(FanMode::Automatic);
             }
         });
@@ -833,9 +846,23 @@ fn render_fan_speed_control_panel(app: &mut AcerApp, ui: &mut egui::Ui) {
             }
 
             if m == FanMode::Custom {
-                let arrow_lbl = if is_active { "<<" } else { ">>" };
-                if ui.small_button(egui::RichText::new(arrow_lbl).size(10.0).color(COLOR_GOLD)).clicked() {
-                    app.set_fan_mode(FanMode::Custom);
+                let arrow_lbl = if is_active { "Tutup <<" } else { "Atur Kurva >>" };
+                let arrow_btn = ui.add(
+                    egui::Button::new(
+                        egui::RichText::new(arrow_lbl)
+                            .size(10.0)
+                            .color(if is_active { COLOR_CYAN } else { COLOR_GOLD }),
+                    )
+                    .fill(if is_active { Color32::from_rgb(14, 38, 54) } else { Color32::from_rgb(32, 28, 14) })
+                    .stroke(Stroke::new(1.0, if is_active { COLOR_CYAN } else { COLOR_GOLD }))
+                    .corner_radius(3),
+                );
+                if arrow_btn.clicked() {
+                    if is_active {
+                        app.set_fan_mode(FanMode::Automatic);
+                    } else {
+                        app.set_fan_mode(FanMode::Custom);
+                    }
                 }
             }
         });
@@ -891,6 +918,15 @@ fn render_fan_speed_control_panel(app: &mut AcerApp, ui: &mut egui::Ui) {
         });
     });
     render_striped_bar(ui, app.gpu_fan_pct, COLOR_CYAN);
+
+    if app.fan_mode == FanMode::Custom {
+        ui.add_space(4.0);
+        ui.label(
+            egui::RichText::new("● Editor kurva aktif di panel tengah")
+                .size(9.5)
+                .color(COLOR_GOLD),
+        );
+    }
 }
 
 // ============================================================================
