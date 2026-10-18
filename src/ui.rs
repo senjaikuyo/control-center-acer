@@ -224,72 +224,92 @@ fn render_top_header(app: &mut AcerApp, ctx: &egui::Context, ui: &mut egui::Ui) 
 }
 
 // ============================================================================
-// 2. DASHBOARD MAIN 3x2 GRID
+// 2. DASHBOARD MAIN 3x2 GRID (STRICT EQUAL-WIDTH COLUMNS)
 // ============================================================================
 fn render_dashboard_grid(app: &mut AcerApp, ui: &mut egui::Ui) {
-    let avail_w = ui.available_width();
-    let col_w = ((avail_w - (GRID_GAP * 2.0)) / 3.0).floor();
-    let row1_h = 285.0;
-    let row2_h = 185.0;
+    let row1_h = 300.0;
+    let row2_h = 180.0;
 
     // --- ROW 1 (3 EQUAL COLUMNS) ---
-    ui.horizontal(|ui| {
-        // Col 1: System Telemetry
-        ui.allocate_ui(Vec2::new(col_w, row1_h), |ui| {
-            render_card_frame(ui, col_w, row1_h, |ui| {
+    ui.columns(3, |cols| {
+        // Column 0: System Telemetry
+        egui::Frame::new()
+            .fill(COLOR_CARD_BG)
+            .stroke(Stroke::new(1.0, COLOR_CARD_BORDER))
+            .corner_radius(CARD_CORNER_RADIUS)
+            .inner_margin(CARD_PADDING)
+            .show(&mut cols[0], |ui| {
+                ui.set_height(row1_h - CARD_PADDING * 2.0);
                 render_system_panel(app, ui);
             });
-        });
-        ui.add_space(GRID_GAP);
 
-        // Col 2: Center Gauge OR Custom Fan Curve Editor
-        ui.allocate_ui(Vec2::new(col_w, row1_h), |ui| {
-            render_card_frame(ui, col_w, row1_h, |ui| {
+        // Column 1: Center Gauge OR Custom Fan Curve Editor
+        egui::Frame::new()
+            .fill(COLOR_CARD_BG)
+            .stroke(Stroke::new(1.0, COLOR_CARD_BORDER))
+            .corner_radius(CARD_CORNER_RADIUS)
+            .inner_margin(CARD_PADDING)
+            .show(&mut cols[1], |ui| {
+                ui.set_height(row1_h - CARD_PADDING * 2.0);
                 if app.fan_mode == FanMode::Custom {
                     render_custom_fan_curve_panel(app, ui);
                 } else {
                     render_speedometer_gauge_panel(app, ui);
                 }
             });
-        });
-        ui.add_space(GRID_GAP);
 
-        // Col 3: FAN Speed Control
-        ui.allocate_ui(Vec2::new(col_w, row1_h), |ui| {
-            render_card_frame(ui, col_w, row1_h, |ui| {
+        // Column 2: FAN Speed Control
+        egui::Frame::new()
+            .fill(COLOR_CARD_BG)
+            .stroke(Stroke::new(1.0, COLOR_CARD_BORDER))
+            .corner_radius(CARD_CORNER_RADIUS)
+            .inner_margin(CARD_PADDING)
+            .show(&mut cols[2], |ui| {
+                ui.set_height(row1_h - CARD_PADDING * 2.0);
                 render_fan_speed_control_panel(app, ui);
             });
-        });
     });
 
     ui.add_space(GRID_GAP);
 
     // --- ROW 2 (3 EQUAL COLUMNS) ---
-    ui.horizontal(|ui| {
-        // Col 1: Memory and Storage
-        ui.allocate_ui(Vec2::new(col_w, row2_h), |ui| {
-            render_card_frame(ui, col_w, row2_h, |ui| {
+    ui.columns(3, |cols| {
+        // Column 0: Memory and Storage
+        egui::Frame::new()
+            .fill(COLOR_CARD_BG)
+            .stroke(Stroke::new(1.0, COLOR_CARD_BORDER))
+            .corner_radius(CARD_CORNER_RADIUS)
+            .inner_margin(CARD_PADDING)
+            .show(&mut cols[0], |ui| {
+                ui.set_height(row2_h - CARD_PADDING * 2.0);
                 render_memory_storage_panel(app, ui);
             });
-        });
-        ui.add_space(GRID_GAP);
 
-        // Col 2: Preference (8 Toggles)
-        ui.allocate_ui(Vec2::new(col_w, row2_h), |ui| {
-            render_card_frame(ui, col_w, row2_h, |ui| {
+        // Column 1: Preference (8 Toggles)
+        egui::Frame::new()
+            .fill(COLOR_CARD_BG)
+            .stroke(Stroke::new(1.0, COLOR_CARD_BORDER))
+            .corner_radius(CARD_CORNER_RADIUS)
+            .inner_margin(CARD_PADDING)
+            .show(&mut cols[1], |ui| {
+                ui.set_height(row2_h - CARD_PADDING * 2.0);
                 render_preference_panel(app, ui);
             });
-        });
-        ui.add_space(GRID_GAP);
 
-        // Col 3: Configuration (Blue Light & Display)
-        ui.allocate_ui(Vec2::new(col_w, row2_h), |ui| {
-            render_card_frame(ui, col_w, row2_h, |ui| {
+        // Column 2: Configuration
+        egui::Frame::new()
+            .fill(COLOR_CARD_BG)
+            .stroke(Stroke::new(1.0, COLOR_CARD_BORDER))
+            .corner_radius(CARD_CORNER_RADIUS)
+            .inner_margin(CARD_PADDING)
+            .show(&mut cols[2], |ui| {
+                ui.set_height(row2_h - CARD_PADDING * 2.0);
                 render_configuration_panel(app, ui);
             });
-        });
     });
 }
+
+// ============================================================================
 
 fn render_card_frame<R>(ui: &mut egui::Ui, width: f32, height: f32, add_contents: impl FnOnce(&mut egui::Ui) -> R) -> R {
     egui::Frame::new()
@@ -305,7 +325,6 @@ fn render_card_frame<R>(ui: &mut egui::Ui, width: f32, height: f32, add_contents
         .inner
 }
 
-// ============================================================================
 // PANEL: SYSTEM TELEMETRY (ROW 1, COL 1)
 // ============================================================================
 fn render_system_panel(app: &AcerApp, ui: &mut egui::Ui) {
@@ -658,20 +677,28 @@ fn render_custom_fan_curve_panel(app: &mut AcerApp, ui: &mut egui::Ui) {
     let mut fine_tune_changed = false;
     let mut temp_val = active_nodes[idx].temp;
     let mut speed_val = active_nodes[idx].speed;
+    let min_t = if idx > 0 { active_nodes[idx - 1].temp + 1.0 } else { 20.0 };
+    let max_t = if idx + 1 < active_nodes.len() { active_nodes[idx + 1].temp - 1.0 } else { 100.0 };
 
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(format!("P{} Temp:", idx + 1)).size(10.0).color(COLOR_TEXT_MUTED));
-        let min_t = if idx > 0 { active_nodes[idx - 1].temp + 1.0 } else { 20.0 };
-        let max_t = if idx + 1 < active_nodes.len() { active_nodes[idx + 1].temp - 1.0 } else { 100.0 };
-        if ui.add(egui::Slider::new(&mut temp_val, min_t..=max_t).suffix("°C").show_value(true)).changed() {
+        ui.label(egui::RichText::new(format!("P{} Suhu:", idx + 1)).size(10.0).color(COLOR_TEXT_MUTED));
+        if ui.add(egui::DragValue::new(&mut temp_val).range(min_t..=max_t).suffix("°C").speed(0.5)).changed() {
             fine_tune_changed = true;
         }
 
-        ui.add_space(4.0);
+        ui.add_space(8.0);
         ui.label(egui::RichText::new("Duty:").size(10.0).color(COLOR_TEXT_MUTED));
-        if ui.add(egui::Slider::new(&mut speed_val, 0.0..=100.0).suffix("%").show_value(true)).changed() {
+        if ui.add(egui::DragValue::new(&mut speed_val).range(0.0..=100.0).suffix("%").speed(0.5)).changed() {
             fine_tune_changed = true;
         }
+
+        ui.add_space(8.0);
+        ui.label(
+            egui::RichText::new(format!("{}°C / {}%", cur_temp, cur_speed))
+                .size(10.0)
+                .strong()
+                .color(line_col),
+        );
     });
 
     if fine_tune_changed {
@@ -684,41 +711,38 @@ fn render_custom_fan_curve_panel(app: &mut AcerApp, ui: &mut egui::Ui) {
         app.curve_has_unsaved_changes = true;
     }
 
-    ui.add_space(3.0);
+    ui.add_space(4.0);
     ui.horizontal(|ui| {
-        if ui.button(egui::RichText::new("⟲").size(11.0).color(COLOR_TEXT_MUTED)).on_hover_text("Reset to default curve").clicked() {
+        if ui.button(egui::RichText::new("⟲ Reset").size(10.5).color(COLOR_TEXT_MUTED)).on_hover_text("Reset kurva ke default").clicked() {
             app.reset_active_curve();
         }
 
-        ui.add_space(4.0);
-        ui.label(egui::RichText::new("Node:").size(10.0).color(COLOR_TEXT_MUTED));
-        ui.label(
-            egui::RichText::new(format!("P{} ({}°C -> {}%)", idx + 1, cur_temp, cur_speed))
-                .size(10.5)
-                .strong()
-                .color(line_col),
+        ui.add_space(6.0);
+        let has_unsaved = app.curve_has_unsaved_changes;
+        let btn_label = if has_unsaved { "● Apply & Save" } else { "✓ Saved" };
+        let btn_col = if has_unsaved { COLOR_GOLD } else { COLOR_CYAN };
+        let apply_btn = ui.add(
+            egui::Button::new(egui::RichText::new(btn_label).size(10.5).strong().color(Color32::WHITE))
+                .fill(if has_unsaved { Color32::from_rgb(160, 100, 10) } else { Color32::from_rgb(14, 45, 60) })
+                .stroke(Stroke::new(1.0, btn_col))
+                .corner_radius(3)
+                .min_size(Vec2::new(105.0, 22.0)),
         );
-
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let has_unsaved = app.curve_has_unsaved_changes;
-            let btn_label = if has_unsaved { "● Apply & Save" } else { "💾 Apply" };
-            let btn_color = if has_unsaved { COLOR_GOLD } else { COLOR_CYAN };
-            if ui.button(egui::RichText::new(btn_label).size(10.5).color(btn_color)).clicked() {
-                app.sync_custom_curve_to_tailord();
-            }
-        });
+        if apply_btn.clicked() {
+            app.sync_custom_curve_to_tailord();
+        }
     });
 
     if app.curve_has_unsaved_changes {
-        ui.label(egui::RichText::new("● Unsaved curve changes — click 'Apply & Save'").size(9.5).color(COLOR_GOLD));
+        ui.label(egui::RichText::new("● Unsaved changes — click 'Apply & Save'").size(9.0).color(COLOR_GOLD));
     } else if let Some(ref msg) = app.curve_feedback {
         let fb_col = if msg.contains("✓") { COLOR_TEMP_GREEN } else { COLOR_GOLD };
-        ui.label(egui::RichText::new(msg).size(9.5).color(fb_col));
+        ui.label(egui::RichText::new(msg).size(9.0).color(fb_col));
     }
 }
 
 fn render_fan_curve_grid(ui: &mut egui::Ui, nodes: &mut Vec<FanCurveNode>, line_col: Color32, selected_idx: &mut usize) -> bool {
-    let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 122.0), egui::Sense::click_and_drag());
+    let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 110.0), egui::Sense::click_and_drag());
     let painter = ui.painter_at(rect);
 
     painter.rect_filled(rect, 3.0, Color32::from_rgb(11, 14, 20));
@@ -874,26 +898,25 @@ fn render_fan_speed_control_panel(app: &mut AcerApp, ui: &mut egui::Ui) {
     ui.add_space(4.0);
 
     // Dual RPM Readouts
-    ui.horizontal(|ui| {
-        let half_w = (ui.available_width() - 8.0) / 2.0;
-        ui.allocate_ui(Vec2::new(half_w, 36.0), |ui| {
+    ui.columns(2, |cols| {
+        cols[0].vertical(|ui| {
             ui.label(
                 egui::RichText::new(format!("{} RPM", app.cpu_fan_rpm))
-                    .size(18.0)
+                    .size(17.0)
                     .strong()
                     .color(COLOR_TEXT_WHITE),
             );
-            ui.label(egui::RichText::new("CPU fan speed").size(9.5).color(COLOR_CYAN));
+            ui.label(egui::RichText::new("CPU fan").size(9.0).color(COLOR_CYAN));
         });
 
-        ui.allocate_ui(Vec2::new(half_w, 36.0), |ui| {
+        cols[1].vertical(|ui| {
             ui.label(
                 egui::RichText::new(format!("{} RPM", app.gpu_fan_rpm))
-                    .size(18.0)
+                    .size(17.0)
                     .strong()
                     .color(COLOR_TEXT_WHITE),
             );
-            ui.label(egui::RichText::new("GPU fan speed").size(9.5).color(COLOR_CYAN));
+            ui.label(egui::RichText::new("GPU fan").size(9.0).color(COLOR_CYAN));
         });
     });
 
@@ -1341,7 +1364,7 @@ pub fn render_circular_dial(ui: &mut egui::Ui, label: &str, pct: u32, subtext: &
     );
 
     painter.text(
-        Pos2::new(center.x, rect.max.y - 4.0),
+        Pos2::new(center.x, rect.max.y - 8.0),
         egui::Align2::CENTER_CENTER,
         label,
         FontId::proportional(9.5),
