@@ -5,10 +5,16 @@
 #include <QDBusInterface>
 #include <QDBusMessage>
 #include <QDBusConnection>
+#include <QDBusVariant>
 #include <QStorageInfo>
 #include <cmath>
+#include <algorithm>
 
 HardwareBridge::HardwareBridge(QObject *parent) : QObject(parent) {
+    // Default 5-node curves
+    m_cpuCurve = { {35.0, 20.0}, {45.0, 35.0}, {55.0, 50.0}, {70.0, 75.0}, {85.0, 100.0} };
+    m_gpuCurve = { {40.0, 20.0}, {50.0, 40.0}, {60.0, 55.0}, {72.0, 80.0}, {82.0, 100.0} };
+
     refreshTelemetry();
 
     connect(&m_pollTimer, &QTimer::timeout, this, &HardwareBridge::refreshTelemetry);
@@ -20,6 +26,11 @@ void HardwareBridge::refreshTelemetry() {
     pollNvidia();
     pollMemory();
     pollDisk();
+
+    if (m_fanMode == "Custom") {
+        processCustomCurve();
+    }
+
     emit telemetryChanged();
 }
 
@@ -159,10 +170,10 @@ void HardwareBridge::setPowerMode(const QString &mode) {
 
     QDBusInterface iface("net.hadess.PowerProfiles",
                          "/net/hadess/PowerProfiles",
-                         "net.hadess.PowerProfiles",
+                         "org.freedesktop.DBus.Properties",
                          QDBusConnection::systemBus());
     if (iface.isValid()) {
-        iface.call("SetProfile", profile);
+        iface.call("Set", "net.hadess.PowerProfiles", "ActiveProfile", QVariant::fromValue(QDBusVariant(profile)));
     }
 }
 
@@ -171,29 +182,76 @@ void HardwareBridge::setFanMode(const QString &mode) {
     emit fanModeChanged(mode);
 
     if (mode == "Maximum" || mode == "Turbo") {
-        applyFanSpeed(100);
+        applyFanSpeed(0, 100);
+        applyFanSpeed(1, 100);
     } else if (mode == "Automatic") {
-        applyFanSpeed(0); // 0 restores automatic firmware control
+        applyFanSpeed(0, 0); // 0 restores automatic firmware control
+        applyFanSpeed(1, 0);
+    } else if (mode == "Custom") {
+        processCustomCurve();
     }
 }
 
-void HardwareBridge::applyFanSpeed(int speedPercent) {
+void HardwareBridge::applyFanSpeed(int fanIndex, int speedPercent) {
     int pwm = static_cast<int>(std::round((speedPercent / 100.0) * 255.0));
 
     QDBusInterface iface("com.tux.Tailor",
                          "/com/tux/Tailor",
-                         "com.tux.Tailor.Profiles",
+                         "com.tux.Tailor.Fan",
                          QDBusConnection::systemBus());
     if (iface.isValid()) {
-        iface.call("OverrideSpeed", 0, pwm);
-        iface.call("OverrideSpeed", 1, pwm);
+        uchar fIdx = static_cast<uchar>(std::clamp(fanIndex, 0, 1));
+        uchar pwmVal = static_cast<uchar>(std::clamp(pwm, 0, 255));
+        iface.call("OverrideSpeed", fIdx, pwmVal);
     }
 }
 
+int HardwareBridge::interpolateCurve(const std::vector<CurveNode> &nodes, double currentTemp) {
+    if (nodes.empty()) return 30;
+    if (currentTemp <= nodes.front().temp) return static_cast<int>(nodes.front().speed);
+    if (currentTemp >= nodes.back().temp) return static_cast<int>(nodes.back().speed);
+
+    for (size_t i = 0; i < nodes.size() - 1; ++i) {
+        if (currentTemp >= nodes[i].temp && currentTemp <= nodes[i + 1].temp) {
+            double range = nodes[i + 1].temp - nodes[i].temp;
+            if (range <= 0.001) return static_cast<int>(nodes[i].speed);
+            double t = (currentTemp - nodes[i].temp) / range;
+            return static_cast<int>(std::round(nodes[i].speed + t * (nodes[i + 1].speed - nodes[i].speed)));
+        }
+    }
+    return 30;
+}
+
+void HardwareBridge::processCustomCurve() {
+    int cpuDuty = interpolateCurve(m_cpuCurve, m_cpuTemp);
+    int gpuDuty = interpolateCurve(m_gpuCurve, m_gpuTemp);
+
+    applyFanSpeed(0, cpuDuty);
+    applyFanSpeed(1, gpuDuty);
+}
+
 void HardwareBridge::applyFanCurve(const QString &targetFan, const QVariantList &nodes) {
-    Q_UNUSED(targetFan);
-    Q_UNUSED(nodes);
-    // Synced via Tailord or persistent config in stage 4
+    std::vector<CurveNode> parsed;
+    for (const auto &item : nodes) {
+        QVariantMap map = item.toMap();
+        CurveNode node;
+        node.temp = map.value("temp", 35.0).toDouble();
+        node.speed = map.value("speed", 20.0).toDouble();
+        parsed.push_back(node);
+    }
+    std::sort(parsed.begin(), parsed.end(), [](const CurveNode &a, const CurveNode &b) {
+        return a.temp < b.temp;
+    });
+
+    if (targetFan == "cpu") {
+        m_cpuCurve = parsed;
+    } else {
+        m_gpuCurve = parsed;
+    }
+
+    if (m_fanMode == "Custom") {
+        processCustomCurve();
+    }
 }
 
 void HardwareBridge::setTouchpadEnabled(bool enabled) {
@@ -222,19 +280,24 @@ void HardwareBridge::setNightLight(bool enabled, qreal level) {
 }
 
 void HardwareBridge::setKeyboardColor(int r, int g, int b) {
-    QFile file("/sys/class/leds/rgb:kbd_backlight/multi_intensity");
-    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QTextStream out(&file);
-        out << r << " " << g << " " << b << "\n";
-    }
-
+    // 1. Direct D-Bus to com.tux.Tailor.Led OverrideColor
     QDBusInterface iface("com.tux.Tailor",
                          "/com/tux/Tailor",
                          "com.tux.Tailor.Led",
                          QDBusConnection::systemBus());
     if (iface.isValid()) {
-        int colorInt = ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF);
-        iface.call("OverrideColor", 0, colorInt);
+        QString hexCol = QString("#%1%2%3")
+            .arg(r & 0xFF, 2, 16, QChar('0'))
+            .arg(g & 0xFF, 2, 16, QChar('0'))
+            .arg(b & 0xFF, 2, 16, QChar('0')).toUpper();
+        iface.call("OverrideColor", hexCol);
+    }
+
+    // 2. Sysfs fallback
+    QFile file("/sys/class/leds/rgb:kbd_backlight/multi_intensity");
+    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QTextStream out(&file);
+        out << r << " " << g << " " << b << "\n";
     }
 }
 
@@ -248,4 +311,3 @@ void HardwareBridge::setKeyboardBrightness(int brightnessPercent) {
 
     QProcess::execute("brightnessctl", QStringList() << "--device=rgb:kbd_backlight" << "set" << QString("%1%").arg(brightnessPercent));
 }
-

@@ -39,11 +39,16 @@ ApplicationWindow {
             Layout.preferredHeight: 46
             spacing: 8
 
-            // Left: 4 Navigation Tabs
+            // Left: 4 Navigation Tabs using Authentic OEM Icons
             Row {
                 spacing: 6
                 Repeater {
-                    model: ["ic_system_monitor", "ic_led_device", "ic_basic_setting", "ic_extra_setting"]
+                    model: [
+                        "qrc:/AcerControlCenter/qml/assets/ic_system_monitor.png",
+                        "qrc:/AcerControlCenter/qml/assets/ic_led_device.png",
+                        "qrc:/AcerControlCenter/qml/assets/ic_battery.png",
+                        "qrc:/AcerControlCenter/qml/assets/ic_basic_setting.png"
+                    ]
                     Rectangle {
                         width: 34
                         height: 30
@@ -52,11 +57,12 @@ ApplicationWindow {
                         border.color: root.activeTab === index ? root.colCyan : "transparent"
                         border.width: 1
 
-                        Text {
+                        Image {
                             anchors.centerIn: parent
-                            text: index === 0 ? "⚡" : (index === 1 ? "💡" : (index === 2 ? "🔋" : "⚙"))
-                            font.pixelSize: 13
-                            color: root.activeTab === index ? root.colCyan : root.colTextMuted
+                            width: 18; height: 18
+                            source: modelData
+                            fillMode: Image.PreserveAspectFit
+                            opacity: root.activeTab === index ? 1.0 : 0.6
                         }
 
                         MouseArea {
@@ -75,12 +81,22 @@ ApplicationWindow {
                 Layout.alignment: Qt.AlignHCenter
                 spacing: 4
 
-                Text {
+                Row {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: "Control Center"
-                    font.pixelSize: 15
-                    font.bold: true
-                    color: root.colTextWhite
+                    spacing: 8
+                    Image {
+                        width: 18; height: 18
+                        anchors.verticalCenter: parent.verticalCenter
+                        source: "qrc:/AcerControlCenter/qml/assets/control_center_logo.png"
+                        fillMode: Image.PreserveAspectFit
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "Control Center"
+                        font.pixelSize: 15
+                        font.bold: true
+                        color: root.colTextWhite
+                    }
                 }
 
                 Row {
@@ -136,25 +152,49 @@ ApplicationWindow {
 
             Item { Layout.fillWidth: true }
 
-            // Right: Window Controls
+            // Right: Window Controls (Razor-Sharp High-DPI Vector)
             Row {
                 spacing: 4
                 Rectangle {
-                    width: 28; height: 24; radius: 3
+                    width: 32; height: 24; radius: 3
                     color: btnMinArea.containsMouse ? "#1C2330" : "transparent"
-                    Text { anchors.centerIn: parent; text: "—"; color: root.colTextMuted; font.pixelSize: 11 }
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: 12; height: 1.5
+                        color: btnMinArea.containsMouse ? "white" : root.colTextMuted
+                    }
                     MouseArea { id: btnMinArea; anchors.fill: parent; hoverEnabled: true; onClicked: root.showMinimized() }
                 }
                 Rectangle {
-                    width: 28; height: 24; radius: 3
+                    width: 32; height: 24; radius: 3
                     color: btnMaxArea.containsMouse ? "#1C2330" : "transparent"
-                    Text { anchors.centerIn: parent; text: "□"; color: root.colTextMuted; font.pixelSize: 12 }
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: 10; height: 10
+                        color: "transparent"
+                        border.color: btnMaxArea.containsMouse ? "white" : root.colTextMuted
+                        border.width: 1.5
+                        radius: 1
+                    }
                     MouseArea { id: btnMaxArea; anchors.fill: parent; hoverEnabled: true; onClicked: root.visibility === Window.Maximized ? root.showNormal() : root.showMaximized() }
                 }
                 Rectangle {
-                    width: 28; height: 24; radius: 3
+                    width: 32; height: 24; radius: 3
                     color: btnCloseArea.containsMouse ? "#DC2626" : "transparent"
-                    Text { anchors.centerIn: parent; text: "✕"; color: btnCloseArea.containsMouse ? "white" : root.colTextMuted; font.pixelSize: 11 }
+                    Canvas {
+                        anchors.centerIn: parent
+                        width: 12; height: 12
+                        onPaint: {
+                            var ctx = getContext("2d");
+                            ctx.reset();
+                            ctx.strokeStyle = btnCloseArea.containsMouse ? "white" : "#8B949E";
+                            ctx.lineWidth = 1.5;
+                            ctx.beginPath();
+                            ctx.moveTo(1, 1); ctx.lineTo(11, 11);
+                            ctx.moveTo(11, 1); ctx.lineTo(1, 11);
+                            ctx.stroke();
+                        }
+                    }
                     MouseArea { id: btnCloseArea; anchors.fill: parent; hoverEnabled: true; onClicked: root.close() }
                 }
             }
@@ -264,46 +304,30 @@ ApplicationWindow {
 
                     Item { height: 6 }
 
-                    // CPU Usage Bar
+                    // CPU Usage Bar (Segmented OEM Style)
                     RowLayout {
                         Layout.fillWidth: true
                         Text { text: "< CPU usage"; font.pixelSize: 10; color: root.colTextMuted }
                         Item { Layout.fillWidth: true }
                         Text { text: hardware.cpuUsagePct + " %"; font.pixelSize: 10; color: root.colTextWhite }
                     }
-                    Rectangle {
+                    SegmentedBar {
                         Layout.fillWidth: true
-                        height: 9
-                        radius: 2
-                        color: "#141923"
-                        border.color: "#202836"
-                        Rectangle {
-                            width: parent.width * (hardware.cpuUsagePct / 100.0)
-                            height: parent.height
-                            radius: 2
-                            color: root.colCyan
-                        }
+                        value: hardware.cpuUsagePct
+                        fillColor: root.colCyan
                     }
 
-                    // GPU Usage Bar
+                    // GPU Usage Bar (Segmented OEM Style)
                     RowLayout {
                         Layout.fillWidth: true
                         Text { text: "< GPU usage"; font.pixelSize: 10; color: root.colTextMuted }
                         Item { Layout.fillWidth: true }
                         Text { text: hardware.gpuUsagePct + " %"; font.pixelSize: 10; color: root.colTextWhite }
                     }
-                    Rectangle {
+                    SegmentedBar {
                         Layout.fillWidth: true
-                        height: 9
-                        radius: 2
-                        color: "#141923"
-                        border.color: "#202836"
-                        Rectangle {
-                            width: parent.width * (hardware.gpuUsagePct / 100.0)
-                            height: parent.height
-                            radius: 2
-                            color: root.colCyan
-                        }
+                        value: hardware.gpuUsagePct
+                        fillColor: root.colCyan
                     }
                 }
             }
@@ -439,28 +463,30 @@ ApplicationWindow {
 
                     Item { height: 4 }
 
-                    // CPU Fan Bar
+                    // CPU Fan Bar (Segmented OEM Style)
                     RowLayout {
                         Layout.fillWidth: true
                         Text { text: "CPU FAN"; font.pixelSize: 10; color: root.colTextMuted }
                         Item { Layout.fillWidth: true }
                         Text { text: hardware.cpuFanPct + " %"; font.pixelSize: 10; color: root.colTextWhite }
                     }
-                    Rectangle {
-                        Layout.fillWidth: true; height: 9; radius: 2; color: "#141923"; border.color: "#202836"
-                        Rectangle { width: parent.width * (hardware.cpuFanPct / 100.0); height: parent.height; radius: 2; color: root.colCyan }
+                    SegmentedBar {
+                        Layout.fillWidth: true
+                        value: hardware.cpuFanPct
+                        fillColor: root.colCyan
                     }
 
-                    // GPU Fan Bar
+                    // GPU Fan Bar (Segmented OEM Style)
                     RowLayout {
                         Layout.fillWidth: true
                         Text { text: "GPU FAN"; font.pixelSize: 10; color: root.colTextMuted }
                         Item { Layout.fillWidth: true }
                         Text { text: hardware.gpuFanPct + " %"; font.pixelSize: 10; color: root.colTextWhite }
                     }
-                    Rectangle {
-                        Layout.fillWidth: true; height: 9; radius: 2; color: "#141923"; border.color: "#202836"
-                        Rectangle { width: parent.width * (hardware.gpuFanPct / 100.0); height: parent.height; radius: 2; color: root.colCyan }
+                    SegmentedBar {
+                        Layout.fillWidth: true
+                        value: hardware.gpuFanPct
+                        fillColor: root.colCyan
                     }
                 }
             }

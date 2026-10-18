@@ -112,33 +112,25 @@ Item {
             }
         }
 
-        // Subtabs: CPU Fan | GPU Fan
+        // Subtabs: CPU Fan | GPU Fan using authentic OEM buttons
         Row {
             spacing: 8
             Layout.topMargin: 2
             Layout.bottomMargin: 2
 
             // CPU Fan Tab
-            Rectangle {
-                width: 76
-                height: 22
-                color: "transparent"
+            Image {
+                width: 80
+                height: 24
+                source: curveRoot.activeTab === 0 ? "qrc:/AcerControlCenter/qml/assets/btn_fan_cpu_selected.png" : "qrc:/AcerControlCenter/qml/assets/btn_fan_cpu_normal.png"
+                fillMode: Image.PreserveAspectFit
 
                 Text {
                     anchors.centerIn: parent
                     text: "CPU Fan"
-                    font.pixelSize: 12
+                    font.pixelSize: 11
                     font.bold: curveRoot.activeTab === 0
                     color: curveRoot.activeTab === 0 ? "#FFB300" : "#8B949E"
-                }
-
-                Rectangle {
-                    anchors.bottom: parent.bottom
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    width: parent.width - 12
-                    height: 2
-                    color: "#FFB300"
-                    visible: curveRoot.activeTab === 0
                 }
 
                 MouseArea {
@@ -153,26 +145,18 @@ Item {
             }
 
             // GPU Fan Tab
-            Rectangle {
-                width: 76
-                height: 22
-                color: "transparent"
+            Image {
+                width: 80
+                height: 24
+                source: curveRoot.activeTab === 1 ? "qrc:/AcerControlCenter/qml/assets/btn_fan_gpu_selected.png" : "qrc:/AcerControlCenter/qml/assets/btn_fan_gpu_normal.png"
+                fillMode: Image.PreserveAspectFit
 
                 Text {
                     anchors.centerIn: parent
                     text: "GPU Fan"
-                    font.pixelSize: 12
+                    font.pixelSize: 11
                     font.bold: curveRoot.activeTab === 1
                     color: curveRoot.activeTab === 1 ? "#00E1FF" : "#8B949E"
-                }
-
-                Rectangle {
-                    anchors.bottom: parent.bottom
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    width: parent.width - 12
-                    height: 2
-                    color: "#00E1FF"
-                    visible: curveRoot.activeTab === 1
                 }
 
                 MouseArea {
@@ -187,7 +171,7 @@ Item {
             }
         }
 
-        // 2D Curve Canvas Grid
+        // 2D Curve Canvas Grid with Authentic Clevo Grid Overlay
         Item {
             Layout.fillWidth: true
             Layout.preferredHeight: 125
@@ -198,6 +182,14 @@ Item {
                 color: "#0B0E14"
                 border.color: "#1A212E"
                 border.width: 1
+            }
+
+            // Authentic OEM Grid Frame Texture
+            Image {
+                anchors.fill: parent
+                source: "qrc:/AcerControlCenter/qml/assets/fan_bg_custom.png"
+                opacity: 0.45
+                fillMode: Image.Stretch
             }
 
             Canvas {
@@ -380,48 +372,64 @@ Item {
             }
         }
 
-        // Action Buttons: Reset & Apply
+        // Action Buttons: Authentic OEM Reset & Apply
         RowLayout {
             Layout.fillWidth: true
-            spacing: 8
+            spacing: 10
             Layout.topMargin: 2
 
+            // Authentic OEM Reset Button
             Rectangle {
-                width: 72
-                height: 24
+                width: 76
+                height: 26
                 radius: 3
-                color: "#161C26"
+                color: resetArea.containsMouse ? "#222B3A" : "#161C26"
                 border.color: "#303A4A"
                 border.width: 1
 
-                Text {
+                Row {
                     anchors.centerIn: parent
-                    text: "⟲ Reset"
-                    font.pixelSize: 10
-                    color: "#8B949E"
+                    spacing: 4
+                    Image {
+                        width: 14; height: 14
+                        source: "qrc:/AcerControlCenter/qml/assets/btn_default_normal.png"
+                        fillMode: Image.PreserveAspectFit
+                    }
+                    Text { text: "Reset"; font.pixelSize: 10; color: "#8B949E" }
                 }
 
                 MouseArea {
+                    id: resetArea
                     anchors.fill: parent
+                    hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: curveRoot.resetCurve()
                 }
             }
 
+            // Authentic OEM Apply Button
             Rectangle {
-                width: 110
-                height: 24
+                width: 115
+                height: 26
                 radius: 3
                 color: curveRoot.hasUnsavedChanges ? "#A0640A" : "#0E2D3C"
                 border.color: curveRoot.hasUnsavedChanges ? "#FFB300" : "#00E1FF"
                 border.width: 1
 
-                Text {
+                Row {
                     anchors.centerIn: parent
-                    text: curveRoot.hasUnsavedChanges ? "● Apply & Save" : "✓ Saved"
-                    font.pixelSize: 11
-                    font.bold: true
-                    color: "white"
+                    spacing: 4
+                    Image {
+                        width: 14; height: 14
+                        source: "qrc:/AcerControlCenter/qml/assets/btn_save_normal.png"
+                        fillMode: Image.PreserveAspectFit
+                    }
+                    Text {
+                        text: curveRoot.hasUnsavedChanges ? "Apply & Save" : "Saved"
+                        font.pixelSize: 10
+                        font.bold: true
+                        color: "white"
+                    }
                 }
 
                 MouseArea {

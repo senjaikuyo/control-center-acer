@@ -4,6 +4,12 @@
 #include <QString>
 #include <QVariantList>
 #include <QTimer>
+#include <vector>
+
+struct CurveNode {
+    double temp{35.0};
+    double speed{20.0};
+};
 
 class HardwareBridge : public QObject {
     Q_OBJECT
@@ -60,7 +66,7 @@ public:
 
     Q_INVOKABLE void setPowerMode(const QString &mode);
     Q_INVOKABLE void setFanMode(const QString &mode);
-    Q_INVOKABLE void applyFanSpeed(int speedPercent);
+    Q_INVOKABLE void applyFanSpeed(int fanIndex, int speedPercent);
     Q_INVOKABLE void applyFanCurve(const QString &targetFan, const QVariantList &nodes);
     Q_INVOKABLE void setTouchpadEnabled(bool enabled);
     Q_INVOKABLE void setAirplaneMode(bool enabled);
@@ -79,6 +85,8 @@ private:
     void pollNvidia();
     void pollMemory();
     void pollDisk();
+    void processCustomCurve();
+    int interpolateCurve(const std::vector<CurveNode> &nodes, double currentTemp);
 
     QTimer m_pollTimer;
 
@@ -105,4 +113,7 @@ private:
 
     unsigned long long m_prevIdle{0};
     unsigned long long m_prevTotal{0};
+
+    std::vector<CurveNode> m_cpuCurve;
+    std::vector<CurveNode> m_gpuCurve;
 };

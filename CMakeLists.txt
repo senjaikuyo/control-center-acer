@@ -21,17 +21,35 @@ qt_add_qml_module(acer-control-center
         qml/Main.qml
         qml/components/TachometerGauge.qml
         qml/components/CustomFanCurve.qml
+        qml/components/SegmentedBar.qml
         qml/views/LightingView.qml
         qml/views/BatteryView.qml
         qml/views/SettingsView.qml
     RESOURCES
-        extracted_assets/fanspeed/image/style_1/pointer_temp.png
-        extracted_assets/fanspeed/image/style_1/knob_fan_control.png
-        extracted_assets/fanspeed/image/style_1/knob_fan_custom_normal.png
-        extracted_assets/fanspeed/image/page_systemmonitor/temp/system_temperature_layer1_1.png
-        extracted_assets/fanspeed/image/page_systemmonitor/temp/system_temperature_layer2_2.png
-        extracted_assets/fanspeed/image/page_systemmonitor/temp/system_temperature_needle_layer1_2.png
-        extracted_assets/fanspeed/image/page_systemmonitor/temp/system_temperature_needle_layer2_2.png
+        qml/assets/ic_system_monitor.png
+        qml/assets/ic_led_device.png
+        qml/assets/ic_battery.png
+        qml/assets/ic_basic_setting.png
+        qml/assets/ic_minimize.png
+        qml/assets/ic_fullscreen.png
+        qml/assets/ic_close.png
+        qml/assets/control_center_logo.png
+        qml/assets/temp_dial_bg.png
+        qml/assets/temp_dial_arc.png
+        qml/assets/temp_needle1.png
+        qml/assets/temp_needle2.png
+        qml/assets/knob_fan_control.png
+        qml/assets/fan_bg_custom.png
+        qml/assets/fan_bg_auto.png
+        qml/assets/card_frame_hud.png
+        qml/assets/btn_save_normal.png
+        qml/assets/btn_save_hover.png
+        qml/assets/btn_default_normal.png
+        qml/assets/btn_default_hover.png
+        qml/assets/btn_fan_cpu_selected.png
+        qml/assets/btn_fan_cpu_normal.png
+        qml/assets/btn_fan_gpu_selected.png
+        qml/assets/btn_fan_gpu_normal.png
 )
 
 target_link_libraries(acer-control-center
