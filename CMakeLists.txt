@@ -19,6 +19,7 @@ qt_add_qml_module(acer-control-center
     VERSION 1.0
     QML_FILES
         qml/Main.qml
+        qml/components/TachometerGauge.qml
     RESOURCES
         extracted_assets/fanspeed/image/style_1/pointer_temp.png
         extracted_assets/fanspeed/image/style_1/knob_fan_control.png

@@ -1,3 +1,4 @@
+import "components"
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -294,62 +295,12 @@ ApplicationWindow {
                 border.color: root.colCardBorder
                 border.width: 1
 
-                ColumnLayout {
+                Item {
                     anchors.fill: parent
                     anchors.margins: 14
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Text {
-                            text: "Processor Telemetry"
-                            font.pixelSize: 14
-                            font.bold: true
-                            color: root.colTextWhite
-                        }
-                        Item { Layout.fillWidth: true }
-                        Rectangle {
-                            width: 95; height: 22; radius: 3
-                            color: "#201C0E"
-                            border.color: root.colGold; border.width: 1
-                            Text {
-                                anchors.centerIn: parent
-                                text: "⚙ Atur Kurva >>"
-                                font.pixelSize: 10
-                                font.bold: true
-                                color: root.colGold
-                            }
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: hardware.setFanMode("Custom")
-                            }
-                        }
-                    }
-
-                    // Authentic Center Dial (Speedometer)
-                    Item {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-
-                        // Rotating Needle Demo
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: 70
-                            height: 70
-                            radius: 35
-                            color: "#121620"
-                            border.color: root.colCyan
-                            border.width: 2
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: "CPU\n" + hardware.cpuTemp + "°C"
-                                horizontalAlignment: Text.AlignHCenter
-                                font.pixelSize: 11
-                                font.bold: true
-                                color: root.colTextWhite
-                            }
-                        }
+                    TachometerGauge {
+                        anchors.fill: parent
                     }
                 }
             }
