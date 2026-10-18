@@ -1,0 +1,8 @@
+[package]
+name = "acer-control-center-rust"
+version = "1.0.0"
+edition = "2024"
+
+[dependencies]
+eframe = { version = "0.37", default-features = false, features = ["glow", "wayland", "x11", "default_fonts"] }
+egui = "0.37"
