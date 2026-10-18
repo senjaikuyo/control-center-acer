@@ -877,9 +877,9 @@ fn render_custom_fan_setting_view(app: &mut AcerApp, ui: &mut egui::Ui) {
         &mut app.gpu_curve_nodes
     };
 
-    render_fan_curve_grid(ui, nodes, line_col, &mut app.selected_node_idx);
+    let changed_by_canvas = render_fan_curve_grid(ui, nodes, line_col, &mut app.selected_node_idx);
 
-    // Coordinate Readout Boxes & Action Buttons at Bottom
+    // Coordinate Readout Boxes, Fine-Tuning Sliders & Action Buttons
     let active_nodes = if app.active_curve_tab == 0 {
         &app.cpu_curve_nodes
     } else {
@@ -889,6 +889,42 @@ fn render_custom_fan_setting_view(app: &mut AcerApp, ui: &mut egui::Ui) {
     let idx = app.selected_node_idx.min(active_nodes.len().saturating_sub(1));
     let cur_temp = active_nodes[idx].temp.round() as u32;
     let cur_speed = active_nodes[idx].speed.round() as u32;
+
+    ui.add_space(4.0);
+
+    // Fine-tune controls row
+    let mut fine_tune_changed = false;
+    let mut temp_val = active_nodes[idx].temp;
+    let mut speed_val = active_nodes[idx].speed;
+
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new(format!("P{} Temp:", idx + 1)).size(10.5).color(COLOR_TEXT_MUTED));
+        let min_t = if idx > 0 { active_nodes[idx - 1].temp + 1.0 } else { 20.0 };
+        let max_t = if idx + 1 < active_nodes.len() { active_nodes[idx + 1].temp - 1.0 } else { 100.0 };
+        if ui.add(egui::Slider::new(&mut temp_val, min_t..=max_t).suffix("℃").show_value(true)).changed() {
+            fine_tune_changed = true;
+        }
+
+        ui.add_space(4.0);
+        ui.label(egui::RichText::new("Duty:").size(10.5).color(COLOR_TEXT_MUTED));
+        if ui.add(egui::Slider::new(&mut speed_val, 0.0..=100.0).suffix("%").show_value(true)).changed() {
+            fine_tune_changed = true;
+        }
+    });
+
+    if fine_tune_changed {
+        let nodes_mut = if app.active_curve_tab == 0 {
+            &mut app.cpu_curve_nodes
+        } else {
+            &mut app.gpu_curve_nodes
+        };
+        nodes_mut[idx].temp = temp_val;
+        nodes_mut[idx].speed = speed_val;
+    }
+
+    if changed_by_canvas || fine_tune_changed {
+        app.curve_has_unsaved_changes = true;
+    }
 
     ui.add_space(4.0);
     ui.horizontal(|ui| {
@@ -901,19 +937,9 @@ fn render_custom_fan_setting_view(app: &mut AcerApp, ui: &mut egui::Ui) {
 
         // Readout Boxes
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new("Fan Speed:").size(10.5).color(COLOR_TEXT_MUTED));
+            ui.label(egui::RichText::new("Active Node:").size(10.5).color(COLOR_TEXT_MUTED));
             ui.label(
-                egui::RichText::new(format!("{} %", cur_speed))
-                    .size(11.0)
-                    .strong()
-                    .color(line_col),
-            );
-
-            ui.add_space(10.0);
-
-            ui.label(egui::RichText::new("Temperature:").size(10.5).color(COLOR_TEXT_MUTED));
-            ui.label(
-                egui::RichText::new(format!("{} ℃", cur_temp))
+                egui::RichText::new(format!("P{} ({}℃ -> {}%)", idx + 1, cur_temp, cur_speed))
                     .size(11.0)
                     .strong()
                     .color(line_col),
@@ -929,6 +955,15 @@ fn render_custom_fan_setting_view(app: &mut AcerApp, ui: &mut egui::Ui) {
             }
         });
     });
+
+    if app.curve_has_unsaved_changes {
+        ui.add_space(2.0);
+        ui.label(
+            egui::RichText::new("● Unsaved curve changes — click 'Apply & Save' to activate")
+                .size(10.0)
+                .color(COLOR_GOLD),
+        );
+    }
 
     if let Some(ref msg) = app.curve_feedback {
         ui.add_space(2.0);
@@ -949,7 +984,7 @@ fn render_fan_curve_grid(
     nodes: &mut Vec<FanCurveNode>,
     line_col: Color32,
     selected_idx: &mut usize,
-) {
+) -> bool {
     let (rect, response) = ui.allocate_exact_size(
         Vec2::new(ui.available_width(), 132.0),
         egui::Sense::click_and_drag(),
@@ -1089,6 +1124,8 @@ fn render_fan_curve_grid(
             }
         }
     }
+
+    response.dragged()
 }
 
 // ============================================================================
