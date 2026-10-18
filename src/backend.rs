@@ -674,6 +674,59 @@ impl HardwareController {
         apply_clevo_fan(fan_index, speed)
     }
 
+    /// Sets touchpad state via KWin Wayland D-Bus interface.
+    pub fn set_touchpad_enabled(&self, enabled: bool) {
+        let _ = Command::new("busctl")
+            .args([
+                "--user",
+                "set-property",
+                "org.kde.KWin",
+                "/org/kde/KWin/InputDevice/event14",
+                "org.kde.KWin.InputDevice",
+                "enabled",
+                "b",
+                if enabled { "true" } else { "false" },
+            ])
+            .output();
+    }
+
+    /// Sets airplane mode via rfkill.
+    pub fn set_airplane_mode(&self, enabled: bool) {
+        let arg = if enabled { "block" } else { "unblock" };
+        let _ = Command::new("rfkill").args([arg, "all"]).output();
+    }
+
+    /// Sets night light / blue light filter on KWin Wayland.
+    pub fn set_night_light(&self, enabled: bool, level: f32) {
+        if enabled {
+            // Level 0.0 to 10.0 maps from 6500K down to 3500K warm
+            let temp = (6500.0 - (level.clamp(0.0, 10.0) * 300.0)) as u32;
+            let _ = Command::new("busctl")
+                .args([
+                    "--user",
+                    "call",
+                    "org.kde.KWin.NightLight",
+                    "/org/kde/KWin/NightLight",
+                    "org.kde.KWin.NightLight",
+                    "preview",
+                    "u",
+                    &temp.to_string(),
+                ])
+                .output();
+        } else {
+            let _ = Command::new("busctl")
+                .args([
+                    "--user",
+                    "call",
+                    "org.kde.KWin.NightLight",
+                    "/org/kde/KWin/NightLight",
+                    "org.kde.KWin.NightLight",
+                    "stopPreview",
+                ])
+                .output();
+        }
+    }
+
     /// Overrides fan speed on all fans.
     pub fn apply_fan_speed(&self, speed: u8) -> Result<(), BackendError> {
         apply_clevo_fan_all(speed)

@@ -400,11 +400,15 @@ fn render_bottom_section(app: &mut AcerApp, ui: &mut egui::Ui) {
                 ui.add_space(12.0);
 
                 ui.horizontal(|ui| {
-                    render_toggle_chip(ui, "Touchpad", &mut app.touchpad_enabled);
-                    render_toggle_chip(ui, "Camera", &mut app.camera_enabled);
-                    render_toggle_chip(ui, "Win Lock", &mut app.win_key_lock);
-                    render_toggle_chip(ui, "Fn Lock", &mut app.fn_key_lock);
-                    render_toggle_chip(ui, "Airplane", &mut app.airplane_mode);
+                    if render_toggle_chip(ui, "Touchpad", &mut app.touchpad_enabled) {
+                        app.controller.set_touchpad_enabled(app.touchpad_enabled);
+                    }
+                    let _ = render_toggle_chip(ui, "Camera", &mut app.camera_enabled);
+                    let _ = render_toggle_chip(ui, "Win Lock", &mut app.win_key_lock);
+                    let _ = render_toggle_chip(ui, "Fn Lock", &mut app.fn_key_lock);
+                    if render_toggle_chip(ui, "Airplane", &mut app.airplane_mode) {
+                        app.controller.set_airplane_mode(app.airplane_mode);
+                    }
                 });
             });
 
@@ -422,9 +426,17 @@ fn render_bottom_section(app: &mut AcerApp, ui: &mut egui::Ui) {
                 ui.add_space(10.0);
 
                 ui.horizontal(|ui| {
-                    ui.checkbox(&mut app.blue_light_filter, "Night Filter");
+                    let _prev_filter = app.blue_light_filter;
+                    let _prev_level = app.blue_light_level;
+
+                    if ui.checkbox(&mut app.blue_light_filter, "Night Filter").changed() {
+                        app.controller.set_night_light(app.blue_light_filter, app.blue_light_level);
+                    }
+
                     if app.blue_light_filter {
-                        ui.add(egui::Slider::new(&mut app.blue_light_level, 0.0..=10.0).text("Level"));
+                        if ui.add(egui::Slider::new(&mut app.blue_light_level, 0.0..=10.0).text("Level")).changed() {
+                            app.controller.set_night_light(true, app.blue_light_level);
+                        }
                     }
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -444,7 +456,7 @@ fn render_bottom_section(app: &mut AcerApp, ui: &mut egui::Ui) {
     });
 }
 
-fn render_toggle_chip(ui: &mut egui::Ui, label: &str, state: &mut bool) {
+fn render_toggle_chip(ui: &mut egui::Ui, label: &str, state: &mut bool) -> bool {
     let is_on = *state;
     let bg = if is_on { Color32::from_rgb(20, 38, 55) } else { BG_CARD_SUBTLE };
     let border = if is_on { ACCENT_BLUE } else { BORDER_COLOR };
@@ -459,6 +471,9 @@ fn render_toggle_chip(ui: &mut egui::Ui, label: &str, state: &mut bool) {
     );
     if btn.clicked() {
         *state = !*state;
+        true
+    } else {
+        false
     }
 }
 
