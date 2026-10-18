@@ -301,6 +301,12 @@ ApplicationWindow {
 
                     TachometerGauge {
                         anchors.fill: parent
+                        visible: hardware.fanMode !== "Custom"
+                    }
+
+                    CustomFanCurve {
+                        anchors.fill: parent
+                        visible: hardware.fanMode === "Custom"
                     }
                 }
             }
