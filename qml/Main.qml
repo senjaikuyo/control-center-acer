@@ -107,6 +107,7 @@ ApplicationWindow {
                         model: [
                             { name: "Performance", color: root.colGold },
                             { name: "Entertainment", color: root.colCyan },
+                            { name: "Power Saving", color: "#2979FF" },
                             { name: "Quiet", color: root.colGreen }
                         ]
 
@@ -542,7 +543,7 @@ ApplicationWindow {
                 }
             }
 
-            // ROW 2 - COL 2: PREFERENCE (8 TOGGLES)
+            // ROW 2 - COL 2: PREFERENCE (9 TOGGLES)
             Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -557,52 +558,9 @@ ApplicationWindow {
 
                     Text { text: "Preference"; font.pixelSize: 13; font.bold: true; color: root.colTextWhite }
 
-                    GridLayout {
+                    PreferenceGrid {
                         Layout.fillWidth: true
-                        columns: 4
-                        columnSpacing: 6
-                        rowSpacing: 6
-
-                        property var toggles: [
-                            { label: "Win key\nlock", active: false },
-                            { label: "Swap\nWin/Fn", active: false },
-                            { label: "Fn key\nlock", active: false },
-                            { label: "Touch\nPad", active: true },
-                            { label: "Camera", active: true },
-                            { label: "Airplane", active: false },
-                            { label: "Caps\nLock", active: false },
-                            { label: "Num\nLock", active: true }
-                        ]
-
-                        Repeater {
-                            model: parent.toggles
-                            Rectangle {
-                                Layout.preferredWidth: 64
-                                Layout.preferredHeight: 36
-                                radius: 4
-                                color: modelData.active ? "#0E2636" : "#131822"
-                                border.color: modelData.active ? root.colCyan : "#263040"
-                                border.width: 1
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: modelData.label
-                                    horizontalAlignment: Text.AlignHCenter
-                                    font.pixelSize: 8
-                                    color: modelData.active ? "white" : root.colTextMuted
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        modelData.active = !modelData.active
-                                        if (modelData.label.includes("Touch")) hardware.setTouchpadEnabled(modelData.active)
-                                        if (modelData.label.includes("Airplane")) hardware.setAirplaneMode(modelData.active)
-                                    }
-                                }
-                            }
-                        }
+                        Layout.fillHeight: true
                     }
                 }
             }
@@ -633,23 +591,65 @@ ApplicationWindow {
                         }
                     }
 
+                    // Segmented slider bar as seen in reference
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: 12
+                        radius: 2
+                        color: "#121620"
+                        border.color: "#222C3C"
+                        border.width: 1
+
+                        Row {
+                            anchors.fill: parent
+                            anchors.margins: 2
+                            spacing: 3
+                            Repeater {
+                                model: 16
+                                Rectangle {
+                                    width: (parent.width - 15 * 3) / 16
+                                    height: parent.height
+                                    radius: 1
+                                    color: (blueLightCheck.checked && index < 6) ? root.colCyan : "#1E2634"
+                                }
+                            }
+                        }
+                    }
+
+                    Item { height: 2 }
+
+                    // 3 Mode Profile Icons: Contrast/Standard, Brightness/Sun, Sound/Speaker
                     RowLayout {
-                        spacing: 6
+                        Layout.fillWidth: true
+                        spacing: 8
+
                         Repeater {
-                            model: ["Standard", "Eye Care", "Night"]
+                            model: [
+                                { label: "Standard", icon: "◐" },
+                                { label: "Eye Care", icon: "☼" },
+                                { label: "Night", icon: "♫" }
+                            ]
                             Rectangle {
                                 Layout.preferredWidth: 70
-                                Layout.preferredHeight: 24
+                                Layout.preferredHeight: 28
                                 radius: 4
-                                color: index === 0 ? "#10202C" : "#12161E"
-                                border.color: index === 0 ? root.colCyan : "#263040"
+                                color: (blueLightCheck.checked ? (index === 1 ? "#102838" : "#12161E") : (index === 0 ? "#102838" : "#12161E"))
+                                border.color: (blueLightCheck.checked ? (index === 1 ? root.colCyan : "#263040") : (index === 0 ? root.colCyan : "#263040"))
                                 border.width: 1
 
-                                Text {
+                                Row {
                                     anchors.centerIn: parent
-                                    text: modelData
-                                    font.pixelSize: 10
-                                    color: index === 0 ? "white" : root.colTextMuted
+                                    spacing: 4
+                                    Text {
+                                        text: modelData.icon
+                                        font.pixelSize: 11
+                                        color: (blueLightCheck.checked ? (index === 1 ? root.colCyan : root.colTextMuted) : (index === 0 ? root.colCyan : root.colTextMuted))
+                                    }
+                                    Text {
+                                        text: modelData.label
+                                        font.pixelSize: 9
+                                        color: (blueLightCheck.checked ? (index === 1 ? "white" : root.colTextMuted) : (index === 0 ? "white" : root.colTextMuted))
+                                    }
                                 }
 
                                 MouseArea {
@@ -663,6 +663,55 @@ ApplicationWindow {
                             }
                         }
                     }
+                }
+            }
+        }
+
+        // ====================================================================
+        // FOOTER CAROUSEL BAR (EXACT AS IN OEM REFERENCE)
+        // ====================================================================
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 18
+            spacing: 6
+            visible: root.activeTab === 0
+
+            Text {
+                text: "<"
+                font.pixelSize: 12
+                font.bold: true
+                color: root.colTextMuted
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: hardware.setFanMode("Automatic")
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                height: 4
+                radius: 2
+                color: "#161C26"
+
+                Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width * 0.4
+                    height: 4
+                    radius: 2
+                    color: "#2C384C"
+                }
+            }
+
+            Text {
+                text: ">"
+                font.pixelSize: 12
+                font.bold: true
+                color: root.colTextMuted
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: hardware.setFanMode("Custom")
                 }
             }
         }

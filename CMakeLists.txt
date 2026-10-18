@@ -22,6 +22,7 @@ qt_add_qml_module(acer-control-center
         qml/components/TachometerGauge.qml
         qml/components/CustomFanCurve.qml
         qml/components/SegmentedBar.qml
+        qml/components/PreferenceGrid.qml
         qml/views/LightingView.qml
         qml/views/BatteryView.qml
         qml/views/SettingsView.qml

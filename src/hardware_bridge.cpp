@@ -166,7 +166,7 @@ void HardwareBridge::setPowerMode(const QString &mode) {
 
     QString profile = "balanced";
     if (mode == "Performance") profile = "performance";
-    else if (mode == "Quiet") profile = "power-saver";
+    else if (mode == "Power Saving" || mode == "Quiet") profile = "power-saver";
 
     QDBusInterface iface("net.hadess.PowerProfiles",
                          "/net/hadess/PowerProfiles",

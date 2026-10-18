@@ -31,7 +31,7 @@ class HardwareBridge : public QObject {
     Q_PROPERTY(int gpuFanPct READ gpuFanPct NOTIFY telemetryChanged)
     Q_PROPERTY(QString fanMode READ fanMode NOTIFY fanModeChanged)
 
-    // Power Mode ("Performance", "Entertainment", "Quiet")
+    // Power Mode ("Performance", "Entertainment", "Power Saving", "Quiet")
     Q_PROPERTY(QString powerMode READ powerMode NOTIFY powerModeChanged)
 
     // Memory & Storage
